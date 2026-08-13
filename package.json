@@ -12,7 +12,8 @@
     "db:init": "node scripts/init-db.mjs",
     "db:seed": "node scripts/seed-db.mjs",
     "db:migrate": "node scripts/migrate-auth.mjs",
-    "db:migrate-users": "node scripts/migrate-users.mjs"
+    "db:migrate-users": "node scripts/migrate-users.mjs",
+    "db:update-users": "node scripts/update-users.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",
