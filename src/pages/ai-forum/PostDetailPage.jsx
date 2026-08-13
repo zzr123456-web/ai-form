@@ -9,7 +9,10 @@ import TagPill from '../../components/ai-forum/common/TagPill.jsx'
 import EmptyState from '../../components/ai-forum/common/EmptyState.jsx'
 import CommentThread from '../../components/ai-forum/common/CommentThread.jsx'
 import { useAuth } from '../../components/ai-forum/AuthProvider.jsx'
-import { getPost, getComments, getPosts } from '../../utils/ai-forum/apiClient.js'
+import {
+  getPost, getComments, getPosts,
+  getInteractions, togglePostLike, togglePostFavorite, createComment, toggleCommentLike,
+} from '../../utils/ai-forum/apiClient.js'
 import { formatRelativeTime, formatNumber } from '../../utils/ai-forum/aiForumUtils.js'
 
 export default function PostDetailPage() {
@@ -24,12 +27,16 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // ====== 互动状态：本地切换，未登录走 requireAuth 拦截 ======
+  // ====== 互动状态：与后端同步，未登录走 requireAuth 拦截 ======
   const [liked, setLiked] = useState(false)
   const [favored, setFavored] = useState(false)
   const [commentText, setCommentText] = useState('')
+  // 当前用户已点赞过的评论 id 列表（传至 CommentThread 控制高亮）
+  const [likedCommentIds, setLikedCommentIds] = useState([])
+  // 评论提交 / 点赞提交 loading，避免重复触发
+  const [submittingComment, setSubmittingComment] = useState(false)
 
-  // ====== 数据加载：postId 变化时重新拉取帖子 + 评论 ======
+  // ====== 数据加载：postId 变化时重新拉取帖子 + 评论 + 互动状态 ======
   // cancelled 标志防止快速切换路由时旧请求覆盖新状态（组件已卸载仍 setState）
   useEffect(() => {
     let cancelled = false
@@ -40,11 +47,15 @@ export default function PostDetailPage() {
       setPost(null)
       setComments([])
       setRelatedPosts([])
+      setLiked(false)
+      setFavored(false)
+      setLikedCommentIds([])
 
       // 并行加载帖子与评论，减少串行等待
-      const [postData, commentsData] = await Promise.all([
+      const [postData, commentsData, interactionsData] = await Promise.all([
         getPost(id),
         getComments(id),
+        getInteractions(id), // 获取当前用户的点赞/收藏状态
       ])
 
       if (cancelled) return
@@ -59,6 +70,12 @@ export default function PostDetailPage() {
       setPost(postData)
       // getComments 失败时兜底为空数组，不影响帖子主体展示
       setComments(Array.isArray(commentsData) ? commentsData : [])
+      // 互动状态：未登录/无记录时保持默认 false
+      if (interactionsData) {
+        setLiked(!!interactionsData.liked)
+        setFavored(!!interactionsData.favored)
+        setLikedCommentIds(Array.isArray(interactionsData.likedCommentIds) ? interactionsData.likedCommentIds : [])
+      }
       setLoading(false)
 
       // 相关推荐：best-effort 加载，失败不影响主流程
@@ -105,18 +122,44 @@ export default function PostDetailPage() {
     return Array.from(map.values())
   }, [comments])
 
-  // ====== 互动事件处理：保留 mock 行为，不在本次任务范围 ======
+  // ====== 互动事件处理：全部接入真实 API 持久化 ======
 
-  /** 点赞：本地切换，数字 ±1；未登录 requireAuth 拦截，不执行后续逻辑 */
-  const handleLike = () => {
+  /** 帖子点赞：未登录拦截，已登录调用 POST /posts/:id/like（toggle） */
+  const handleLike = async () => {
     if (!requireAuth('登录后点赞')) return
+    // 先乐观更新 UI，失败再回滚
+    const prevLiked = liked
+    const prevLikes = post?.likes || 0
     setLiked((v) => !v)
+    if (post) {
+      setPost({ ...post, likes: prevLikes + (prevLiked ? -1 : 1) })
+    }
+
+    const result = await togglePostLike(id)
+    if (!result.ok) {
+      // 失败回滚
+      setLiked(prevLiked)
+      if (post) setPost({ ...post, likes: prevLikes })
+      alert(`点赞失败：${result.error || '请稍后重试'}`)
+    }
   }
 
-  /** 收藏：未登录拦截，已登录本地切换视觉（mock 场景不做持久化） */
-  const handleSave = () => {
+  /** 收藏：未登录拦截，已登录调用 POST /posts/:id/favorite（toggle） */
+  const handleSave = async () => {
     if (!requireAuth('登录后收藏')) return
+    const prevFavored = favored
+    const prevFavCount = post?.favoritesCount || 0
     setFavored((v) => !v)
+    if (post) {
+      setPost({ ...post, favoritesCount: prevFavCount + (prevFavored ? -1 : 1) })
+    }
+
+    const result = await togglePostFavorite(id)
+    if (!result.ok) {
+      setFavored(prevFavored)
+      if (post) setPost({ ...post, favoritesCount: prevFavCount })
+      alert(`收藏失败：${result.error || '请稍后重试'}`)
+    }
   }
 
   /** 举报：未登录拦截，已登录弹出提示（运营后台工单 Phase2 接入） */
@@ -130,12 +173,88 @@ export default function PostDetailPage() {
     alert('分享链接已复制')
   }
 
-  /** 发布评论：未登录拦截，已登录提交 mock 提示 */
-  const handleCommentSubmit = () => {
+  /** 发布评论：未登录拦截，已登录调用 POST /posts/:id/comments 写入数据库 */
+  const handleCommentSubmit = async () => {
     if (!requireAuth('登录后发表评论')) return
-    if (!commentText.trim()) return
-    alert('评论已提交（Mock）')
+    const text = commentText.trim()
+    if (!text || submittingComment) return
+
+    setSubmittingComment(true)
+    const result = await createComment(id, text)
+    setSubmittingComment(false)
+
+    if (!result.ok) {
+      alert(`评论失败：${result.error || '请稍后重试'}`)
+      return
+    }
+    // 成功：后端返回最新评论树，直接替换；清空输入框
+    if (Array.isArray(result.comments) && result.comments.length > 0) {
+      setComments(result.comments)
+    } else {
+      // 若后端未返回全量（兼容场景），重新拉取一次
+      const fresh = await getComments(id)
+      setComments(Array.isArray(fresh) ? fresh : [])
+    }
     setCommentText('')
+    // 同步帖子 comments_count
+    if (post) setPost({ ...post, commentsCount: (post.commentsCount || 0) + 1 })
+  }
+
+  /**
+   * 评论点赞（含一级/二级评论）
+   * 由 CommentThread 调用，传 commentId
+   */
+  const handleLikeComment = async (commentId) => {
+    if (!requireAuth('登录后点赞评论')) return
+    if (!commentId) return
+
+    // 乐观更新：切换 likedCommentIds，并更新对应评论 likes 计数 +-1
+    const prevSet = new Set(likedCommentIds)
+    const wasLiked = prevSet.has(commentId)
+    const nextLikedIds = wasLiked
+      ? likedCommentIds.filter((x) => x !== commentId)
+      : [...likedCommentIds, commentId]
+    setLikedCommentIds(nextLikedIds)
+
+    // 更新评论树中对应条目的 likes 数字（顶层 + replies 都要找）
+    function applyDelta(list, targetId, delta) {
+      return list.map((c) => {
+        if (c.id === targetId) return { ...c, likes: (c.likes || 0) + delta }
+        if (c.replies?.length) return { ...c, replies: applyDelta(c.replies, targetId, delta) }
+        return c
+      })
+    }
+    setComments((prev) => applyDelta(prev, commentId, wasLiked ? -1 : 1))
+
+    const result = await toggleCommentLike(commentId)
+    if (!result.ok) {
+      // 失败回滚
+      setLikedCommentIds(likedCommentIds)
+      setComments((prev) => applyDelta(prev, commentId, wasLiked ? 1 : -1))
+      // 不弹窗干扰，仅 console 提示
+      console.warn('[likeComment] 失败:', result.error)
+    }
+  }
+
+  /**
+   * 回复评论（楼中楼）：CommentThread 提交回复时调用
+   * @param {string} parentId 父评论 id（一级评论 id，不做更深嵌套）
+   * @param {string} content  回复内容
+   */
+  const handleReplySubmit = async (parentId, content) => {
+    if (!requireAuth('登录后回复评论')) return { ok: false, error: '未登录' }
+    const text = (content || '').trim()
+    if (!text || !parentId) return { ok: false, error: '内容或父评论缺失' }
+
+    const result = await createComment(id, text, parentId)
+    if (!result.ok) return result
+
+    // 成功：替换评论树 + 更新计数
+    if (Array.isArray(result.comments) && result.comments.length > 0) {
+      setComments(result.comments)
+    }
+    if (post) setPost({ ...post, commentsCount: (post.commentsCount || 0) + 1 })
+    return { ok: true }
   }
 
   // ====== Loading：骨架屏 ======
@@ -353,9 +472,11 @@ export default function PostDetailPage() {
                 <button
                   type="button"
                   onClick={handleCommentSubmit}
-                  className="inline-flex items-center gap-1.5 h-8 px-4 rounded-af-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                  disabled={submittingComment}
+                  className="inline-flex items-center gap-1.5 h-8 px-4 rounded-af-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Send className="size-3.5" /> 发布评论
+                  <Send className="size-3.5" />
+                  {submittingComment ? '提交中...' : '发布评论'}
                 </button>
               </div>
             </div>
@@ -366,6 +487,9 @@ export default function PostDetailPage() {
                 comments={comments}
                 users={usersFromComments}
                 formatRelativeTime={formatRelativeTime}
+                likedCommentIds={likedCommentIds}
+                onLikeComment={handleLikeComment}
+                onReplySubmit={handleReplySubmit}
               />
             ) : (
               <EmptyState

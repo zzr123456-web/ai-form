@@ -13,6 +13,7 @@
     "db:seed": "node scripts/seed-db.mjs",
     "db:migrate": "node scripts/migrate-auth.mjs",
     "db:migrate-users": "node scripts/migrate-users.mjs",
+    "db:migrate-interactions": "node scripts/migrate-interactions.mjs",
     "db:update-users": "node scripts/update-users.mjs"
   },
   "dependencies": {

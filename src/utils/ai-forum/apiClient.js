@@ -174,6 +174,78 @@ export async function getComments(postId) {
   return Array.isArray(res.data) ? res.data : []
 }
 
+// === 互动相关：点赞 / 收藏 / 评论写入 ===
+
+/**
+ * 获取当前用户对该帖的互动状态（点赞、收藏、评论点赞）
+ * 未登录也可调用（返回全 false）
+ * @param {string} postId 帖子 id
+ * @returns {Promise<{liked:boolean, favored:boolean, likedCommentIds:string[]}|null>}
+ */
+export async function getInteractions(postId) {
+  if (!postId) return null
+  const res = await request('GET', `/posts/${postId}/interactions`)
+  return res.ok ? res.data : null
+}
+
+/**
+ * 帖子点赞 / 取消点赞（toggle）
+ * @param {string} postId 帖子 id
+ * @returns {Promise<{ok:boolean, liked?:boolean, delta?:number, error?:string}>}
+ */
+export async function togglePostLike(postId) {
+  if (!postId) return { ok: false, error: '缺少 postId' }
+  const res = await request('POST', `/posts/${postId}/like`)
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, liked: !!res.data?.liked, delta: res.data?.delta || 0 }
+}
+
+/**
+ * 帖子收藏 / 取消收藏（toggle）
+ * @param {string} postId 帖子 id
+ * @returns {Promise<{ok:boolean, favored?:boolean, delta?:number, error?:string}>}
+ */
+export async function togglePostFavorite(postId) {
+  if (!postId) return { ok: false, error: '缺少 postId' }
+  const res = await request('POST', `/posts/${postId}/favorite`)
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, favored: !!res.data?.favored, delta: res.data?.delta || 0 }
+}
+
+/**
+ * 创建评论（支持楼中楼回复）
+ * @param {string} postId  帖子 id
+ * @param {string} content 评论内容
+ * @param {string} [parentId] 父评论 id（回复时传）
+ * @returns {Promise<{ok:boolean, comments?:Array, id?:string, error?:string}>}
+ */
+export async function createComment(postId, content, parentId) {
+  if (!postId) return { ok: false, error: '缺少 postId' }
+  if (!content || !content.trim()) return { ok: false, error: '评论内容不能为空' }
+  const res = await request('POST', `/posts/${postId}/comments`, undefined, {
+    content: content.trim(),
+    parentId: parentId || null,
+  })
+  if (!res.ok) return { ok: false, error: res.error }
+  return {
+    ok: true,
+    id: res.data?.id,
+    comments: Array.isArray(res.data?.comments) ? res.data.comments : [],
+  }
+}
+
+/**
+ * 评论点赞 / 取消点赞（toggle）
+ * @param {string} commentId 评论 id
+ * @returns {Promise<{ok:boolean, liked?:boolean, delta?:number, error?:string}>}
+ */
+export async function toggleCommentLike(commentId) {
+  if (!commentId) return { ok: false, error: '缺少 commentId' }
+  const res = await request('POST', `/comments/${commentId}/like`)
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, liked: !!res.data?.liked, delta: res.data?.delta || 0 }
+}
+
 // === 版块与话题 ===
 
 /**
@@ -296,6 +368,11 @@ export default {
   getPost,
   createPost,
   getComments,
+  getInteractions,
+  togglePostLike,
+  togglePostFavorite,
+  createComment,
+  toggleCommentLike,
   getBoards,
   getTopics,
   getUsers,

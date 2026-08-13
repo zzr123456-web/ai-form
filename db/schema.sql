@@ -138,6 +138,48 @@ CREATE TABLE IF NOT EXISTS notifications (
     ON DELETE CASCADE
 );
 
+-- 10. 帖子点赞关联表（记录每个用户对每个帖子的点赞状态，联合主键防重复）
+CREATE TABLE IF NOT EXISTS post_likes (
+  post_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (post_id, user_id),
+  CONSTRAINT fk_post_likes_post
+    FOREIGN KEY (post_id) REFERENCES posts(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_post_likes_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+);
+
+-- 11. 帖子收藏关联表（记录每个用户对每个帖子的收藏状态，联合主键防重复）
+CREATE TABLE IF NOT EXISTS post_favorites (
+  post_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (post_id, user_id),
+  CONSTRAINT fk_post_favorites_post
+    FOREIGN KEY (post_id) REFERENCES posts(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_post_favorites_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+);
+
+-- 12. 评论点赞关联表（记录每个用户对每条评论的点赞）
+CREATE TABLE IF NOT EXISTS comment_likes (
+  comment_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (comment_id, user_id),
+  CONSTRAINT fk_comment_likes_comment
+    FOREIGN KEY (comment_id) REFERENCES comments(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_comment_likes_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+);
+
 -- ============================================================
 -- 索引（覆盖高频查询路径）
 -- ============================================================
@@ -146,3 +188,9 @@ CREATE INDEX IF NOT EXISTS idx_posts_board_id ON posts(board_id);
 CREATE INDEX IF NOT EXISTS idx_posts_author_id ON posts(author_id);
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_tags_tag_name ON post_tags(tag_name);
+-- 新增：按用户维度查询点赞/收藏列表
+CREATE INDEX IF NOT EXISTS idx_post_likes_user_id ON post_likes(user_id);
+CREATE INDEX IF NOT EXISTS idx_post_favorites_user_id ON post_favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_comment_likes_user_id ON comment_likes(user_id);
+-- 新增：评论作者索引（用于"我的评论"查询）
+CREATE INDEX IF NOT EXISTS idx_comments_author_id ON comments(author_id);

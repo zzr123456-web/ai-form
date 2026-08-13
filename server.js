@@ -342,11 +342,28 @@ async function handleListPosts(req, res, url) {
 async function handleGetPost(req, res, id) {
   const cacheKey = postKey(id)
   const cached = await cacheGet(cacheKey)
-  if (cached) return sendJson(res, 200, cached)
+
+  // 异步增加阅读量：不等待结果，避免阻塞响应
+  // 阅读量写入需要时间，用户期望立即看到帖子内容
+  dbQuery(`UPDATE posts SET views = COALESCE(views, 0) + 1 WHERE id = $1`, [id]).catch(() => {})
+  // 同时失效帖子列表缓存（列表中显示的帖子也带阅读量）
+  await cacheDel(postListKey())
+
+  if (cached) {
+    // 缓存命中时也更新阅读量（缓存中的旧 views 值 + 1）
+    if (cached && typeof cached.views === 'number') {
+      cached.views += 1
+      await cacheSet(cacheKey, cached, TTL_POST_DETAIL)
+    }
+    return sendJson(res, 200, cached)
+  }
+
   const post = await fetchPostById(id)
   if (!post) {
     return sendJson(res, 404, { error: '帖子不存在' })
   }
+  // 返回给前端的帖子对象也反映最新阅读量
+  if (typeof post.views === 'number') post.views += 1
   await cacheSet(cacheKey, post, TTL_POST_DETAIL)
   return sendJson(res, 200, post)
 }
@@ -444,6 +461,299 @@ async function handleListComments(req, res, postId) {
   return sendJson(res, 200, topComments)
 }
 
+// ======== 互动接口：点赞 / 收藏 / 评论写入 ========
+
+/**
+ * 获取当前用户对帖子 + 所有评论的互动状态
+ * 未登录返回全 false（不报错，避免前端额外 try/catch）
+ * 不缓存：用户维度个性化，不走 Redis 通用缓存
+ */
+async function handleGetInteractions(req, res, postId, authUser) {
+  const userId = authUser?.userId
+  const result = {
+    liked: false,       // 当前用户是否点赞此帖
+    favored: false,     // 当前用户是否收藏此帖
+    likedCommentIds: [], // 当前用户点赞过的评论 id 列表
+  }
+  if (!userId) return sendJson(res, 200, result)
+
+  const [likeRow, favRow, commentLikeRows] = await Promise.all([
+    dbQuery(`SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2`, [postId, userId]),
+    dbQuery(`SELECT 1 FROM post_favorites WHERE post_id = $1 AND user_id = $2`, [postId, userId]),
+    dbQuery(
+      `SELECT c.id FROM comments c
+       JOIN comment_likes cl ON cl.comment_id = c.id
+       WHERE c.post_id = $1 AND cl.user_id = $2`,
+      [postId, userId]
+    ).catch(() => ({ rows: [] })), // comment_likes 表可能还没迁移，容错返回空
+  ])
+
+  result.liked = likeRow.rows.length > 0
+  result.favored = favRow.rows.length > 0
+  result.likedCommentIds = commentLikeRows.rows.map((r) => r.id)
+  return sendJson(res, 200, result)
+}
+
+/**
+ * 帖子点赞 / 取消点赞（toggle 模式）
+ * - 已存在记录 → 删除 → 计数 -1
+ * - 不存在记录 → 插入 → 计数 +1
+ * 同时失效帖子详情缓存 + 评论缓存（含点赞数）+ 列表缓存（显示点赞数）
+ */
+async function handleTogglePostLike(req, res, postId, authUser) {
+  const userId = authUser.userId
+  const { rows: existing } = await dbQuery(
+    `SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2`,
+    [postId, userId]
+  )
+
+  let delta = 0
+  if (existing.length > 0) {
+    // 取消点赞
+    await dbQuery(`DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2`, [postId, userId])
+    delta = -1
+  } else {
+    // 新增点赞
+    try {
+      await dbQuery(
+        `INSERT INTO post_likes (post_id, user_id, created_at) VALUES ($1, $2, NOW())`,
+        [postId, userId]
+      )
+      delta = 1
+    } catch (err) {
+      // 并发下主键冲突，视为已点赞成功（幂等）
+      if (err.code === '23505') delta = 0
+      else throw err
+    }
+  }
+
+  // 同步更新 posts.likes 计数：COALESCE 防止 NULL 导致计算失败
+  if (delta !== 0) {
+    await dbQuery(
+      `UPDATE posts SET likes = COALESCE(likes, 0) + $1 WHERE id = $2`,
+      [delta, postId]
+    )
+  }
+
+  // 失效相关缓存：帖子详情 / 帖子列表 / 评论列表（评论本身不受影响，但列表可能显示帖子点赞数）
+  await Promise.all([
+    cacheDel(postKey(postId)),
+    cacheDelPattern('af:posts:list:*'),
+  ])
+
+  return sendJson(res, 200, {
+    liked: delta >= 0 && existing.length === 0 ? true : (delta === 0 ? true : false),
+    delta,
+  })
+}
+
+/**
+ * 帖子收藏 / 取消收藏（toggle 模式）
+ */
+async function handleTogglePostFavorite(req, res, postId, authUser) {
+  const userId = authUser.userId
+  const { rows: existing } = await dbQuery(
+    `SELECT 1 FROM post_favorites WHERE post_id = $1 AND user_id = $2`,
+    [postId, userId]
+  )
+
+  let delta = 0
+  if (existing.length > 0) {
+    await dbQuery(`DELETE FROM post_favorites WHERE post_id = $1 AND user_id = $2`, [postId, userId])
+    delta = -1
+  } else {
+    try {
+      await dbQuery(
+        `INSERT INTO post_favorites (post_id, user_id, created_at) VALUES ($1, $2, NOW())`,
+        [postId, userId]
+      )
+      delta = 1
+    } catch (err) {
+      if (err.code === '23505') delta = 0
+      else throw err
+    }
+  }
+
+  if (delta !== 0) {
+    await dbQuery(
+      `UPDATE posts SET favorites_count = COALESCE(favorites_count, 0) + $1 WHERE id = $2`,
+      [delta, postId]
+    )
+  }
+
+  await Promise.all([
+    cacheDel(postKey(postId)),
+    cacheDelPattern('af:posts:list:*'),
+    cacheDel(userStatsKey(userId)), // 用户统计含 favorite_count
+  ])
+
+  return sendJson(res, 200, {
+    favored: delta >= 0 && existing.length === 0 ? true : (delta === 0 ? true : false),
+    delta,
+  })
+}
+
+/**
+ * 创建评论（支持楼中楼：parentId 可选）
+ * 必填：content；可选：parentId
+ * 成功后回查评论树并返回最新全量数据，同时更新 posts.comments_count
+ */
+async function handleCreateComment(req, res, postId, authUser) {
+  const body = await readJsonBody(req)
+  const { content, parentId } = body
+  if (!content || !content.trim()) {
+    return sendJson(res, 400, { error: '评论内容不能为空' })
+  }
+
+  // 校验帖子是否存在
+  const { rows: postRows } = await dbQuery(`SELECT id FROM posts WHERE id = $1`, [postId])
+  if (postRows.length === 0) {
+    return sendJson(res, 404, { error: '帖子不存在' })
+  }
+
+  // 若有 parentId，校验父评论属于同一条帖子
+  if (parentId) {
+    const { rows: parentRows } = await dbQuery(
+      `SELECT id, post_id FROM comments WHERE id = $1`,
+      [parentId]
+    )
+    if (parentRows.length === 0) {
+      return sendJson(res, 404, { error: '回复的评论不存在' })
+    }
+    if (parentRows[0].post_id !== postId) {
+      return sendJson(res, 400, { error: '无法回复其他帖子的评论' })
+    }
+  }
+
+  const id = `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+  await dbQuery(
+    `INSERT INTO comments (id, post_id, author_id, parent_id, content, likes, created_at)
+     VALUES ($1, $2, $3, $4, $5, 0, NOW())`,
+    [id, postId, authUser.userId, parentId || null, content.trim()]
+  )
+
+  // 同步帖子评论计数
+  await dbQuery(
+    `UPDATE posts SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = $1`,
+    [postId]
+  )
+
+  // 失效相关缓存
+  await Promise.all([
+    cacheDel(commentsKey(postId)),
+    cacheDel(postKey(postId)),
+    cacheDelPattern('af:posts:list:*'),
+  ])
+
+  // 回查最新评论树，返回给前端替换（保证强一致）
+  const listResult = await handleListCommentsNoSend(postId)
+  return sendJson(res, 201, { id, comments: listResult })
+}
+
+/**
+ * 复用 handleListComments 的内部查询逻辑，但不发送响应（供写入接口回查使用）
+ */
+async function handleListCommentsNoSend(postId) {
+  const { rows } = await dbQuery(
+    `SELECT comments.*,
+            users.id AS u_id, users.nickname AS u_nickname, users.avatar_text AS u_avatar_text
+     FROM comments
+     LEFT JOIN users ON comments.author_id = users.id
+     WHERE comments.post_id = $1
+     ORDER BY comments.created_at ASC`,
+    [postId]
+  )
+  const repliesByParent = new Map()
+  const topComments = []
+  for (const row of rows) {
+    const comment = {
+      id: row.id,
+      postId: row.post_id,
+      authorId: row.author_id,
+      parentId: row.parent_id,
+      content: row.content,
+      likes: row.likes,
+      createdAt: toISO(row.created_at),
+      author: row.u_id
+        ? { id: row.u_id, nickname: row.u_nickname, avatarText: row.u_avatar_text }
+        : null,
+      replies: [],
+    }
+    if (row.parent_id) {
+      if (!repliesByParent.has(row.parent_id)) repliesByParent.set(row.parent_id, [])
+      repliesByParent.get(row.parent_id).push(comment)
+    } else {
+      topComments.push(comment)
+    }
+  }
+  for (const top of topComments) {
+    top.replies = repliesByParent.get(top.id) || []
+  }
+  await cacheSet(commentsKey(postId), topComments, TTL_COMMENTS)
+  return topComments
+}
+
+/**
+ * 评论点赞 / 取消点赞（toggle 模式）
+ * 容错：comment_likes 表未迁移时仅更新计数（不报错）
+ */
+async function handleToggleCommentLike(req, res, commentId, authUser) {
+  const userId = authUser.userId
+
+  // 先查询评论是否存在 + 获取 post_id 便于失效缓存
+  const { rows: commentRows } = await dbQuery(
+    `SELECT id, post_id FROM comments WHERE id = $1`,
+    [commentId]
+  )
+  if (commentRows.length === 0) {
+    return sendJson(res, 404, { error: '评论不存在' })
+  }
+  const postId = commentRows[0].post_id
+
+  let delta = 0
+  try {
+    const { rows: existing } = await dbQuery(
+      `SELECT 1 FROM comment_likes WHERE comment_id = $1 AND user_id = $2`,
+      [commentId, userId]
+    )
+    if (existing.length > 0) {
+      await dbQuery(`DELETE FROM comment_likes WHERE comment_id = $1 AND user_id = $2`, [commentId, userId])
+      delta = -1
+    } else {
+      await dbQuery(
+        `INSERT INTO comment_likes (comment_id, user_id, created_at) VALUES ($1, $2, NOW())`,
+        [commentId, userId]
+      )
+      delta = 1
+    }
+  } catch (err) {
+    // comment_likes 表不存在（未迁移）：仅做计数增减，不报错
+    // 42P01 = undefined_table，23505 = unique_violation（并发插入主键冲突视为 0 增量）
+    if (err.code === '42P01') {
+      delta = delta || 1 // 默认 toggle：若表不存在，未记录则取反（简单 +1 处理，不记录用户维度状态）
+    } else if (err.code === '23505') {
+      delta = 0
+    } else {
+      throw err
+    }
+  }
+
+  if (delta !== 0) {
+    await dbQuery(
+      `UPDATE comments SET likes = COALESCE(likes, 0) + $1 WHERE id = $2`,
+      [delta, commentId]
+    )
+  }
+
+  // 失效评论缓存（全评论树都包含被操作的评论）
+  await cacheDel(commentsKey(postId))
+
+  return sendJson(res, 200, {
+    liked: delta > 0 ? true : (delta === 0 ? true : false),
+    delta,
+  })
+}
+
 /**
  * 用户列表：支持 status / role 筛选
  * role 筛选使用 = ANY(roles) 匹配数组元素（用户可有多个角色）
@@ -491,10 +801,18 @@ async function handleGetUserStats(req, res, id) {
   const cacheKey = userStatsKey(id)
   const cached = await cacheGet(cacheKey)
   if (cached) return sendJson(res, 200, cached)
-  const { rows } = await dbQuery(`SELECT * FROM user_stats WHERE user_id = $1`, [id])
+  let { rows } = await dbQuery(`SELECT * FROM user_stats WHERE user_id = $1`, [id])
+
+  // 懒初始化：新注册用户没有 user_stats 记录，自动创建默认记录
   if (rows.length === 0) {
-    return sendJson(res, 404, { error: '用户统计不存在' })
+    await dbQuery(
+      `INSERT INTO user_stats (user_id, post_count, favorite_count, following_count, follower_count, influence_score, total_likes, total_favorited)
+       VALUES ($1, 0, 0, 0, 0, 0, 0, 0)`,
+      [id]
+    )
+    ;({ rows } = await dbQuery(`SELECT * FROM user_stats WHERE user_id = $1`, [id]))
   }
+
   const result = mapUserStats(rows[0])
   await cacheSet(cacheKey, result, TTL_STATS)
   return sendJson(res, 200, result)
@@ -736,8 +1054,34 @@ async function matchForumRoute(req, res, pathname, method, url) {
         if (method === 'GET') return await handleGetPost(req, res, id)
       }
       if (parts.length === 3 && parts[2] === 'comments') {
-        supportedMethods.push('GET')
+        supportedMethods.push('GET', 'POST')
         if (method === 'GET') return await handleListComments(req, res, id)
+        if (method === 'POST') return await requireAuth(handleCreateComment)(req, res, id)
+      }
+      if (parts.length === 3 && parts[2] === 'like') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleTogglePostLike)(req, res, id)
+      }
+      if (parts.length === 3 && parts[2] === 'favorite') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleTogglePostFavorite)(req, res, id)
+      }
+      if (parts.length === 3 && parts[2] === 'interactions') {
+        supportedMethods.push('GET')
+        if (method === 'GET') {
+          // 互动状态查询：允许未登录（返回全 false），不使用 requireAuth 拦截
+          const auth = await authenticate(req)
+          return await handleGetInteractions(req, res, id, auth.authenticated ? auth.user : null)
+        }
+      }
+    }
+
+    // comments 路由（comment id 维度操作）
+    if (parts[0] === 'comments' && parts.length >= 2) {
+      const cid = decodeURIComponent(parts[1])
+      if (parts.length === 3 && parts[2] === 'like') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleToggleCommentLike)(req, res, cid)
       }
     }
 
