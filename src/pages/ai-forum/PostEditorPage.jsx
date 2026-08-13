@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, AlertTriangle, Eye } from 'lucide-react'
+import { Eye } from 'lucide-react'
 import { useAuth } from '../../components/ai-forum/AuthProvider.jsx'
 import { createPost, getBoards } from '../../utils/ai-forum/apiClient.js'
-import { aiEditorSuggestions, tags } from '../../utils/ai-forum/mockData.js'
+import { tags } from '../../utils/ai-forum/mockData.js'
+import AIDraftPanel from '../../components/ai-forum/ai/AIDraftPanel.jsx'
 
 const MAX_TITLE_LENGTH = 100
 const MIN_TITLE_LENGTH = 5
@@ -60,12 +61,6 @@ export default function PostEditorPage() {
       }
       return next
     })
-  }
-
-  const addSuggestedTag = (tag) => {
-    if (selectedTags.has(tag)) return
-    if (selectedTags.size >= MAX_TAG_COUNT) return
-    setSelectedTags((prev) => new Set(prev).add(tag))
   }
 
   const handlePreview = () => {
@@ -129,9 +124,9 @@ export default function PostEditorPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="flex flex-col md:flex-row gap-6">
         {/* 左栏：编辑器主体 */}
-        <div className="md:col-span-2 space-y-6">
+        <div className="flex-1 md:w-2/3 space-y-6">
           {/* 标题输入 */}
           <div className="relative">
             <input
@@ -211,101 +206,10 @@ export default function PostEditorPage() {
           </div>
         </div>
 
-        {/* 右栏：AI 助手占位面板 */}
-        <aside className="md:col-span-1">
-          <div className="bg-card border border-border rounded-af-lg p-5 sticky top-6 space-y-5">
-            {/* 头部 */}
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="size-5 text-vermilion" />
-                <h2 className="font-semibold text-foreground">AI 发帖助手</h2>
-              </div>
-              <p className="text-xs text-afmuted-foreground">Phase2 上线，敬请期待</p>
-            </div>
-
-            {/* 标题建议 */}
-            <div>
-              <p className="text-xs font-medium text-afmuted-foreground mb-2">标题建议</p>
-              <ol className="list-decimal list-inside space-y-1.5 pl-1">
-                {aiEditorSuggestions.titles.map((t, i) => (
-                  <li key={`t${i + 1}`}>
-                    <button
-                      type="button"
-                      onClick={() => setTitle(t)}
-                      className="w-full text-left text-sm text-foreground px-2 py-1.5 rounded-af-md hover:bg-afmuted hover:text-vermilion transition-colors"
-                    >
-                      {t}
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            {/* 推荐标签 */}
-            <div>
-              <p className="text-xs font-medium text-afmuted-foreground mb-2">推荐标签</p>
-              <div className="flex flex-wrap gap-1.5">
-                {aiEditorSuggestions.tags.map((t) => {
-                  const isSelected = selectedTags.has(t)
-                  const isDisabled = !isSelected && selectedTags.size >= MAX_TAG_COUNT
-                  return (
-                    <button
-                      key={`sug-${t}`}
-                      type="button"
-                      onClick={() => addSuggestedTag(t)}
-                      disabled={isDisabled}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                        isSelected
-                          ? 'bg-vermilion text-cream border-vermilion'
-                          : isDisabled
-                          ? 'bg-afmuted/50 text-afmuted-foreground border-border cursor-not-allowed opacity-60'
-                          : 'bg-card text-foreground border-border hover:border-vermilion/60 hover:text-vermilion'
-                      }`}
-                    >
-                      + {t}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* 推荐版块 */}
-            <div>
-              <p className="text-xs font-medium text-afmuted-foreground mb-2">推荐版块</p>
-              <div className="space-y-1.5">
-                {aiEditorSuggestions.boards.map((b) => (
-                  <button
-                    key={`sug-board-${b.id}`}
-                    type="button"
-                    onClick={() => setSelectedBoardId(b.id)}
-                    className={`w-full text-left px-3 py-2 rounded-af-md border transition-colors ${
-                      selectedBoardId === b.id
-                        ? 'border-vermilion bg-vermilion/5 text-vermilion'
-                        : 'border-border bg-background hover:bg-afmuted'
-                    }`}
-                  >
-                    <p className="text-sm font-medium text-foreground">{b.name}</p>
-                    <p className="text-xs text-afmuted-foreground mt-0.5">{b.reason}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 隐私提示 */}
-            <div className="flex items-start gap-2 rounded-af-lg bg-error-bg p-3">
-              <AlertTriangle className="size-4 text-error shrink-0 mt-0.5" />
-              <div>
-                <span className="inline-block text-[10px] font-semibold text-error-foreground bg-error px-1.5 py-0.5 rounded mb-1">
-                  隐私提示
-                </span>
-                <p className="text-xs text-foreground/90 leading-relaxed">{aiEditorSuggestions.privacy}</p>
-              </div>
-            </div>
-
-            {/* 底部占位说明 */}
-            <div className="text-xs text-afmuted-foreground bg-afmuted/30 rounded-af-md p-3 text-center">
-              更多 AI 能力（Phase2）
-            </div>
+        {/* 右栏：AI 助手面板 */}
+        <aside className="w-full md:w-1/3 md:pl-6">
+          <div className="md:sticky md:top-6">
+            <AIDraftPanel />
           </div>
         </aside>
       </div>

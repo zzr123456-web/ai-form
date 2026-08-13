@@ -8,6 +8,7 @@ import Avatar from '../../components/ai-forum/common/Avatar.jsx'
 import TagPill from '../../components/ai-forum/common/TagPill.jsx'
 import EmptyState from '../../components/ai-forum/common/EmptyState.jsx'
 import CommentThread from '../../components/ai-forum/common/CommentThread.jsx'
+import AISummaryCard from '../../components/ai-forum/ai/AISummaryCard.jsx'
 import { useAuth } from '../../components/ai-forum/AuthProvider.jsx'
 import {
   getPost, getComments, getPosts,
@@ -503,6 +504,11 @@ export default function PostDetailPage() {
 
         {/* ====== 右栏：4/12，<1024px grid 自动堆叠至评论区下方 ====== */}
         <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-20 lg:self-start">
+          {/* AI 讨论总结卡 */}
+          <div className="mb-4">
+            <AISummaryCard />
+          </div>
+
           {/* 相关推荐卡 */}
           <div className="bg-card border border-border rounded-af-lg p-5">
             <h2 className="font-semibold text-foreground mb-4">相关推荐</h2>
