@@ -607,17 +607,19 @@ async function handleRegister(req, res) {
   }
 
   // 密码哈希后写入（列名严格对齐 schema.sql：users 表无 avatar_url，用 avatar_text）
+  // roles 使用 ARRAY[]::text[] 显式类型，兼容 PostgreSQL 严格模式（否则会报错：cannot determine type of empty array）
   const passwordHash = hashPassword(password)
   const userId = crypto.randomUUID()
   try {
     await dbQuery(
       `INSERT INTO users (id, nickname, handle, email, password_hash, status, roles, avatar_text, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'active', ARRAY[], '', NOW(), NOW())`,
+       VALUES ($1, $2, $3, $4, $5, 'active', ARRAY[]::text[], '', NOW(), NOW())`,
       [userId, nickname, handle, email, passwordHash]
     )
   } catch (err) {
     console.error('[register] 插入用户失败:', err.message)
-    return sendJson(res, 500, { error: '注册失败，请稍后重试' })
+    // 把具体数据库错误信息返回给前端，便于调试（生产环境可替换为通用文案）
+    return sendJson(res, 500, { error: `注册失败：${err.message}` })
   }
 
   // 缓存失效：用户列表变更，清除对应 key
