@@ -4,9 +4,13 @@
  */
 
 // === 用户 ===
+// 统一默认密码：123456，bcrypt 哈希预计算避免运行时开销
+const DEFAULT_PASSWORD_HASH = '$2a$10$YXGrgztvHeENWeHFXYFHUeuk1t5hGr3BRglsuuW.6.uAC42iykZPi'
+
 export const currentUser = {
   id: 'u_alex',
   nickname: 'AlexChen',
+  email: 'alex@ai-forum.dev',
   avatarText: 'A',
   bio: 'AI 应用开发者 / 关注 RAG 与 Agent 落地实践',
   handle: 'alexchen',
@@ -19,15 +23,17 @@ export const currentUser = {
 
 export const users = [
   currentUser,
-  { id: 'u_chen', nickname: '陈明哲', avatarText: '陈', bio: 'Prompt 工程爱好者', handle: 'minghez', profession: '算法工程师', city: '北京', joinedAt: '2023-11-02', status: 'active', roles: ['user'] },
-  { id: 'u_lin', nickname: '林晓彤', avatarText: '林', bio: '效率工具控，分享 AI 编程实践', handle: 'xiaotongl', profession: '全栈开发', city: '杭州', joinedAt: '2024-01-20', status: 'active', roles: ['user'] },
-  { id: 'u_wang', nickname: '王浩然', avatarText: '王', bio: '专注本地化模型部署', handle: 'haoranw', profession: '运维架构师', city: '深圳', joinedAt: '2023-08-15', status: 'active', roles: ['user'] },
-  { id: 'u_zhang', nickname: '张悦', avatarText: '张', bio: '学术伦理研究者', handle: 'yuezhang', profession: '科研人员', city: '南京', joinedAt: '2024-05-08', status: 'active', roles: ['user'] },
-  { id: 'u_li', nickname: '李静怡', avatarText: '李', bio: '多模态方向', handle: 'jingyil', profession: '研究生', city: '成都', joinedAt: '2024-06-30', status: 'active', roles: ['user'] },
+  { id: 'u_chen', nickname: '陈明哲', email: 'mingzhe@ai-forum.dev', avatarText: '陈', bio: 'Prompt 工程爱好者', handle: 'minghez', profession: '算法工程师', city: '北京', joinedAt: '2023-11-02', status: 'active', roles: ['user'] },
+  { id: 'u_lin', nickname: '林晓彤', email: 'xiaotong@ai-forum.dev', avatarText: '林', bio: '效率工具控，分享 AI 编程实践', handle: 'xiaotongl', profession: '全栈开发', city: '杭州', joinedAt: '2024-01-20', status: 'active', roles: ['user'] },
+  { id: 'u_wang', nickname: '王浩然', email: 'haoran@ai-forum.dev', avatarText: '王', bio: '专注本地化模型部署', handle: 'haoranw', profession: '运维架构师', city: '深圳', joinedAt: '2023-08-15', status: 'active', roles: ['user'] },
+  { id: 'u_zhang', nickname: '张悦', email: 'yuezhang@ai-forum.dev', avatarText: '张', bio: '学术伦理研究者', handle: 'yuezhang', profession: '科研人员', city: '南京', joinedAt: '2024-05-08', status: 'active', roles: ['user'] },
+  { id: 'u_li', nickname: '李静怡', email: 'jingyi@ai-forum.dev', avatarText: '李', bio: '多模态方向', handle: 'jingyil', profession: '研究生', city: '成都', joinedAt: '2024-06-30', status: 'active', roles: ['user'] },
   // roles 是数组，moderator 筛选需要 includes，因为用户可以有多个角色
-  { id: 'u_zhao', nickname: '赵子轩', avatarText: '赵', bio: 'Agent 框架开发者', handle: 'zixuanz', profession: '后端开发', city: '广州', joinedAt: '2023-12-10', status: 'limited', roles: ['user', 'moderator'] },
-  { id: 'u_spam', nickname: '营销号小王', avatarText: '营', bio: '', handle: 'spamwang', profession: '', city: '', joinedAt: '2024-07-01', status: 'banned', roles: ['user'] },
+  { id: 'u_zhao', nickname: '赵子轩', email: 'zixuan@ai-forum.dev', avatarText: '赵', bio: 'Agent 框架开发者', handle: 'zixuanz', profession: '后端开发', city: '广州', joinedAt: '2023-12-10', status: 'limited', roles: ['user', 'moderator'] },
+  { id: 'u_spam', nickname: '营销号小王', email: 'spam@ai-forum.dev', avatarText: '营', bio: '', handle: 'spamwang', profession: '', city: '', joinedAt: '2024-07-01', status: 'banned', roles: ['user'] },
 ]
+
+export { DEFAULT_PASSWORD_HASH }
 
 export const userStats = {
   postCount: 48,

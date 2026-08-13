@@ -9,6 +9,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   nickname TEXT,
+  email TEXT,
   avatar_text TEXT,
   bio TEXT,
   handle TEXT,
@@ -17,7 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
   joined_at DATE,
   status TEXT,
   roles TEXT[],
-  password_hash TEXT  -- 存储 bcrypt 哈希，不存明文
+  password_hash TEXT,  -- 存储 bcrypt 哈希，不存明文
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 2. 用户统计表（与 users 一对一）

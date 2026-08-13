@@ -114,6 +114,7 @@ function mapUser(row) {
   return {
     id: row.id,
     nickname: row.nickname,
+    email: row.email || '',
     avatarText: row.avatar_text,
     bio: row.bio,
     handle: row.handle,
@@ -512,9 +513,9 @@ async function handleLogin(req, res) {
     return sendJson(res, 400, { error: '请输入用户名和密码' })
   }
 
-  // 按 nickname 或 handle 查询用户
+  // 按 nickname、handle 或 email 查询用户（三种方式登录）
   const { rows } = await dbQuery(
-    `SELECT * FROM users WHERE nickname = $1 OR handle = $1`,
+    `SELECT * FROM users WHERE nickname = $1 OR handle = $1 OR email = $1`,
     [username]
   )
   if (rows.length === 0) {
@@ -605,13 +606,13 @@ async function handleRegister(req, res) {
     handle = generateHandle(nickname)
   }
 
-  // 密码哈希后写入
+  // 密码哈希后写入（列名严格对齐 schema.sql：users 表无 avatar_url，用 avatar_text）
   const passwordHash = hashPassword(password)
   const userId = crypto.randomUUID()
   try {
     await dbQuery(
-      `INSERT INTO users (id, nickname, handle, email, password_hash, status, roles, avatar_url, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'active', ARRAY[]::VARCHAR[], '', NOW(), NOW())`,
+      `INSERT INTO users (id, nickname, handle, email, password_hash, status, roles, avatar_text, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'active', ARRAY[], '', NOW(), NOW())`,
       [userId, nickname, handle, email, passwordHash]
     )
   } catch (err) {

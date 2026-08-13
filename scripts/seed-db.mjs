@@ -17,6 +17,7 @@ import {
   posts,
   comments,
   notifications,
+  DEFAULT_PASSWORD_HASH,
 } from '../src/utils/ai-forum/mockData.js';
 
 // 记录每张表插入行数，用于最终汇总输出
@@ -52,15 +53,17 @@ async function truncateAll() {
   `);
 }
 
-// users：roles 是数组，需用 $10::text[] 显式转型
+// users：roles 是数组，需用 $12::text[] 显式转型
+// 新增 email + password_hash（默认密码 123456 的 bcrypt 哈希）
 async function seedUsers() {
   for (const u of users) {
     await query(
-      `INSERT INTO users (id, nickname, avatar_text, bio, handle, profession, city, joined_at, status, roles)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[])`,
+      `INSERT INTO users (id, nickname, email, avatar_text, bio, handle, profession, city, joined_at, status, roles, password_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[], $12)`,
       [
         u.id,
         u.nickname,
+        u.email,
         u.avatarText,
         u.bio,
         u.handle,
@@ -69,6 +72,7 @@ async function seedUsers() {
         u.joinedAt,
         u.status,
         u.roles,
+        DEFAULT_PASSWORD_HASH,
       ]
     );
     insertedCounts.users++;
