@@ -567,7 +567,8 @@ async function handleMe(req, res, authUser) {
 
 /**
  * 匹配所有 /api/forum/* 路径
- * 返回 true 表示已处理，false 表示未匹配（交给兜底 404）
+ * 返回 true 表示已处理，false 表示未匹配（交给兜底 404/405）
+ * 返回 {methodMatched: true} 表示路径匹配但方法不支持（调用方返回 405）
  * 整体 try/catch 兜底，异常返回 500
  */
 async function matchForumRoute(req, res, pathname, method, url) {
@@ -580,35 +581,44 @@ async function matchForumRoute(req, res, pathname, method, url) {
     // 去掉 /api/forum 前缀，得到子路径（如 '/posts/p1/comments'）
     const sub = pathname.slice('/api/forum'.length)
 
+    // 记录该路径支持的方法（用于判断是否返回 405）
+    const supportedMethods = []
+
     // === 静态路由 ===
-    if (sub === '/health' && method === 'GET') {
-      return handleHealth(req, res)
+    if (sub === '/health') {
+      supportedMethods.push('GET')
+      if (method === 'GET') return handleHealth(req, res)
     }
-    if (sub === '/boards' && method === 'GET') {
-      return await handleListBoards(req, res)
+    if (sub === '/boards') {
+      supportedMethods.push('GET')
+      if (method === 'GET') return await handleListBoards(req, res)
     }
-    if (sub === '/topics' && method === 'GET') {
-      return await handleListTopics(req, res)
+    if (sub === '/topics') {
+      supportedMethods.push('GET')
+      if (method === 'GET') return await handleListTopics(req, res)
     }
-    if (sub === '/posts' && method === 'GET') {
-      return await handleListPosts(req, res, url)
+    if (sub === '/posts') {
+      supportedMethods.push('GET', 'POST')
+      if (method === 'GET') return await handleListPosts(req, res, url)
+      if (method === 'POST') return await handleCreatePost(req, res)
     }
-    if (sub === '/posts' && method === 'POST') {
-      return await handleCreatePost(req, res)
-    }
-    if (sub === '/users' && method === 'GET') {
-      return await handleListUsers(req, res, url)
+    if (sub === '/users') {
+      supportedMethods.push('GET')
+      if (method === 'GET') return await handleListUsers(req, res, url)
     }
 
     // === 认证路由 ===
-    if (sub === '/auth/login' && method === 'POST') {
-      return await handleLogin(req, res)
+    if (sub === '/auth/login') {
+      supportedMethods.push('POST')
+      if (method === 'POST') return await handleLogin(req, res)
     }
-    if (sub === '/auth/logout' && method === 'POST') {
-      return await requireAuth(handleLogout)(req, res)
+    if (sub === '/auth/logout') {
+      supportedMethods.push('POST')
+      if (method === 'POST') return await requireAuth(handleLogout)(req, res)
     }
-    if (sub === '/auth/me' && method === 'GET') {
-      return await requireAuth(handleMe)(req, res)
+    if (sub === '/auth/me') {
+      supportedMethods.push('GET')
+      if (method === 'GET') return await requireAuth(handleMe)(req, res)
     }
 
     // === 动态路由：按 '/' 分段解析 ===
@@ -616,22 +626,41 @@ async function matchForumRoute(req, res, pathname, method, url) {
 
     if (parts[0] === 'posts' && parts.length >= 2) {
       const id = decodeURIComponent(parts[1])
-      if (parts.length === 2 && method === 'GET') {
-        return await handleGetPost(req, res, id)
+      if (parts.length === 2) {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleGetPost(req, res, id)
       }
-      if (parts.length === 3 && parts[2] === 'comments' && method === 'GET') {
-        return await handleListComments(req, res, id)
+      if (parts.length === 3 && parts[2] === 'comments') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleListComments(req, res, id)
       }
     }
 
     if (parts[0] === 'users' && parts.length >= 2) {
       const id = decodeURIComponent(parts[1])
-      if (parts.length === 2 && method === 'GET') {
-        return await handleGetUser(req, res, id)
+      if (parts.length === 2) {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleGetUser(req, res, id)
       }
-      if (parts.length === 3 && parts[2] === 'stats' && method === 'GET') {
-        return await handleGetUserStats(req, res, id)
+      if (parts.length === 3 && parts[2] === 'stats') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleGetUserStats(req, res, id)
       }
+    }
+
+    // 路径匹配但方法不支持：返回 405，告知支持的方法
+    if (supportedMethods.length > 0) {
+      res.writeHead(405, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Content-Type': 'application/json; charset=utf-8',
+        Allow: supportedMethods.join(', '),
+      })
+      res.end(JSON.stringify({
+        error: `Method Not Allowed，支持的方法: ${supportedMethods.join(', ')}`,
+      }))
+      return true
     }
 
     return false

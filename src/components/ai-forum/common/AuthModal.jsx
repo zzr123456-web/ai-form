@@ -29,9 +29,22 @@ export default function AuthModal() {
 
   const forced = guestStatus === 'expired'
 
-  const handleSubmit = (e) => {
+  /**
+   * 登录/注册表单提交
+   * - 注册模式：使用昵称作为 username（后端同时支持 nickname/handle）
+   * - 登录模式：使用邮箱作为 username
+   * 注意：login 失败返回 null 时，调用方（AuthProvider）不处理提示，
+   * 这里临时使用简单的错误展示（真实产品会有更完善的表单校验反馈）
+   */
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    login()
+    const username = mode === 'register' ? form.nickname : form.email
+    if (!username || !form.password) return
+    const result = await login(username, form.password)
+    if (!result) {
+      // 登录失败：简单重置密码字段，用户可重试
+      setForm((f) => ({ ...f, password: '' }))
+    }
   }
 
   const goLoginPage = () => {
