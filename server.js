@@ -1,11 +1,15 @@
 /**
- * AI 辅助论坛 · 后端 API 服务
+ * AI 辅助论坛 · 全栈服务（API + 前端静态文件）
  * 基于 Node.js 内置 http 模块，零第三方 Web 框架依赖
+ * 同时服务 /api/forum/* API 请求和 dist/ 前端静态文件
  * 监听端口 8787（可通过 process.env.PORT 覆盖）
  * 数据库连接池由 db/pool.js 提供
  * 集成 Redis 缓存层（db/redis.js）与 JWT 认证（utils/auth.js）
  */
 import http from 'node:http'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { query as dbQuery, pool as dbPool, healthCheck as dbHealthCheck } from './db/pool.js'
 import { cacheGet, cacheSet, cacheDel, cacheDelPattern, isRedisConnected, healthCheckRedis, closeRedis } from './db/redis.js'
@@ -18,6 +22,29 @@ import { verifyPassword, signToken, createSession, destroySession } from './util
 import { authenticate, requireAuth } from './utils/middleware.js'
 
 dotenv.config()
+
+// === 静态文件服务配置 ===
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const DIST_DIR = path.join(__dirname, 'dist')
+
+// MIME 类型映射
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.webp': 'image/webp',
+  '.map': 'application/json; charset=utf-8',
+}
 
 // 数据库连接状态：启动后由 healthCheck 异步设置，未连接时不阻断服务，仅影响 /health 端点
 let dbConnected = false
@@ -613,6 +640,71 @@ async function matchForumRoute(req, res, pathname, method, url) {
   }
 }
 
+// === 静态文件服务 ===
+
+/**
+ * 服务静态文件：根据请求路径查找 dist/ 下的对应文件
+ * 找不到文件则返回 false（由调用方决定是否 SPA fallback）
+ */
+function serveStaticFile(req, res, pathname) {
+  // 安全检查：防止路径遍历攻击
+  const sanitizedPath = path.normalize(pathname).replace(/^(\.\.[/\\])+/, '')
+  const filePath = path.join(DIST_DIR, sanitizedPath)
+
+  // 确保解析后的路径在 DIST_DIR 内
+  if (!filePath.startsWith(DIST_DIR)) {
+    return false
+  }
+
+  try {
+    // 检查文件是否存在
+    fs.accessSync(filePath, fs.constants.F_OK)
+
+    // 如果是目录，尝试返回 index.html
+    const stat = fs.statSync(filePath)
+    const actualPath = stat.isDirectory()
+      ? path.join(filePath, 'index.html')
+      : filePath
+
+    if (!fs.existsSync(actualPath)) {
+      return false
+    }
+
+    const ext = path.extname(actualPath).toLowerCase()
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream'
+    const content = fs.readFileSync(actualPath)
+
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': ext === '.html'
+        ? 'no-cache, must-revalidate'
+        : 'public, max-age=31536000, immutable',
+    })
+    res.end(content)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * SPA fallback：返回 index.html 供 React Router 处理
+ */
+function serveSpaFallback(res) {
+  const indexPath = path.join(DIST_DIR, 'index.html')
+  try {
+    const content = fs.readFileSync(indexPath)
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache, must-revalidate',
+    })
+    res.end(content)
+    return true
+  } catch {
+    return false
+  }
+}
+
 // === HTTP 服务器主流程 ===
 
 const server = http.createServer(async (req, res) => {
@@ -626,10 +718,27 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  // 优先匹配论坛路由
+  // 优先匹配 API 路由
   if (pathname.startsWith('/api/forum')) {
     const handled = await matchForumRoute(req, res, pathname, method, url)
     if (handled) return
+    // API 路由未匹配到，返回 404 JSON
+    sendJson(res, 404, { error: 'API Not Found' })
+    return
+  }
+
+  // GET/HEAD 请求尝试服务静态文件
+  if (method === 'GET' || method === 'HEAD') {
+    // 根路径直接返回 index.html
+    if (pathname === '/' || pathname === '') {
+      if (serveStaticFile(req, res, '/index.html')) return
+    }
+
+    // 尝试匹配静态文件
+    if (serveStaticFile(req, res, pathname)) return
+
+    // 静态文件未找到 → SPA fallback（让 React Router 处理路由）
+    if (serveSpaFallback(res)) return
   }
 
   // 兜底 404
