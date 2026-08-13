@@ -13,7 +13,7 @@ import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { query as dbQuery, pool as dbPool, healthCheck as dbHealthCheck } from './db/pool.js'
-import { cacheGet, cacheSet, cacheDel, cacheDelPattern, isRedisConnected, healthCheckRedis, closeRedis } from './db/redis.js'
+import { cacheGet, cacheSet, cacheDel, cacheDelPattern, isRedisConnected, healthCheckRedis, closeRedis, redis } from './db/redis.js'
 import {
   boardListKey, topicListKey, userListKey, userKey, userStatsKey,
   postListKey, postKey, commentsKey,
@@ -21,7 +21,7 @@ import {
 } from './utils/cache.js'
 import { verifyPassword, hashPassword, signToken, createSession, destroySession } from './utils/auth.js'
 import { authenticate, requireAuth } from './utils/middleware.js'
-import { health as llmHealth } from './utils/llm.js'
+import { health as llmHealth, createChatCompletion, streamChatCompletion, truncateForLog } from './utils/llm.js'
 
 dotenv.config()
 
@@ -106,6 +106,44 @@ function toISO(value) {
   if (!value) return value
   if (value instanceof Date) return value.toISOString()
   return value
+}
+
+function computeGuestStatus(sessionRow) {
+  if (sessionRow.bound_user_id) {
+    return { remainingSeconds: sessionRow.remaining_seconds ?? 300, status: 'bound' }
+  }
+  const expiresAt = sessionRow.expires_at instanceof Date ? sessionRow.expires_at : new Date(sessionRow.expires_at)
+  const now = Date.now()
+  const diffMs = expiresAt.getTime() - now
+  const remainingSeconds = Math.max(0, Math.floor(diffMs / 1000))
+  let status
+  if (remainingSeconds === 0) {
+    status = 'expired'
+  } else if (remainingSeconds <= 30) {
+    status = 'expiring'
+  } else {
+    status = 'active'
+  }
+  return { remainingSeconds, status }
+}
+
+async function aiRateLimit(userId, limit = 10, windowSeconds = 60) {
+  const key = `af:ratelimit:ai:${userId}`
+  try {
+    if (!redis || !isRedisConnected()) {
+      return { ok: true, remaining: limit, limit }
+    }
+    const count = await redis.incr(key)
+    if (count === 1) {
+      await redis.expire(key, windowSeconds)
+    }
+    const ok = count <= limit
+    const remaining = Math.max(0, limit - count)
+    return { ok, remaining, limit }
+  } catch (err) {
+    console.warn(`[aiRateLimit] Redis 频控降级: ${err.message}`)
+    return { ok: true, remaining: limit, limit }
+  }
 }
 
 // === 字段映射：DB snake_case → 前端 camelCase ===
@@ -269,11 +307,12 @@ async function handleListPosts(req, res, url) {
   const sort = url.searchParams.get('sort') || 'latest'
   const boardId = url.searchParams.get('boardId')
   const tag = url.searchParams.get('tag')
+  const search = url.searchParams.get('search')
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
   const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10))
   const offset = (page - 1) * limit
 
-  const cacheKey = postListKey(sort, boardId, tag, page, limit)
+  const cacheKey = postListKey(sort, boardId, tag, page, limit, search)
   const cached = await cacheGet(cacheKey)
   if (cached) return sendJson(res, 200, cached)
 
@@ -287,6 +326,10 @@ async function handleListPosts(req, res, url) {
   if (tag) {
     params.push(tag)
     where.push(`EXISTS (SELECT 1 FROM post_tags WHERE post_id = posts.id AND tag_name = $${params.length})`)
+  }
+  if (search) {
+    params.push(`%${search}%`)
+    where.push(`(posts.title ILIKE $${params.length} OR posts.content ILIKE $${params.length})`)
   }
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
 
@@ -755,6 +798,243 @@ async function handleToggleCommentLike(req, res, authUser, commentId) {
   })
 }
 
+// ======== AI 接口 ========
+
+async function handleAIHealth(req, res) {
+  return sendJson(res, 200, llmHealth())
+}
+
+async function handleAIGenerate(req, res, authUser) {
+  const userId = authUser.userId
+  const rate = await aiRateLimit(userId)
+  if (!rate.ok) {
+    return sendJson(res, 429, { error: 'AI 调用过于频繁，请稍后再试' })
+  }
+
+  const body = await readJsonBody(req)
+  const { messages, model, temperature, max_tokens } = body
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return sendJson(res, 400, { error: '缺少必填字段：messages（非空数组）' })
+  }
+
+  const startMs = Date.now()
+  let success = false
+  let errorMsg = null
+  let usage = null
+  let content = ''
+
+  try {
+    const result = await createChatCompletion(messages, { model, temperature, max_tokens })
+    success = true
+    usage = result.usage
+    content = result.content
+  } catch (e) {
+    errorMsg = String(e.message || e).slice(0, 500)
+  }
+
+  const latMs = Date.now() - startMs
+  const logId = `aul_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+  const logModel = model || 'deepseek-chat'
+  const promptTokens = usage?.prompt_tokens ?? 0
+  const completionTokens = usage?.completion_tokens ?? 0
+  const rawReq = truncateForLog(JSON.stringify({ messages }), 1000)
+
+  dbQuery(
+    `INSERT INTO ai_usage_logs (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, error_msg, raw_request_truncated, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+    [logId, userId, logModel, promptTokens, completionTokens, latMs, errorMsg, rawReq]
+  ).catch((err) => console.warn('[ai_usage_logs] 写入失败:', err.message))
+
+  if (success) {
+    return sendJson(res, 200, { content, from_llm: true, usage: usage || null })
+  }
+  return sendJson(res, 502, { error: errorMsg || 'LLM 调用失败', from_llm: false })
+}
+
+async function handleAIStream(req, res, authUser) {
+  const userId = authUser.userId
+  const rate = await aiRateLimit(userId)
+  if (!rate.ok) {
+    return sendJson(res, 429, { error: 'AI 调用过于频繁，请稍后再试' })
+  }
+
+  const body = await readJsonBody(req)
+  const { messages, model, temperature, max_tokens } = body
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return sendJson(res, 400, { error: '缺少必填字段：messages（非空数组）' })
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  })
+
+  const startMs = Date.now()
+  let success = false
+  let errorMsg = null
+  let usage = null
+  const logId = `aul_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+  const logModel = model || 'deepseek-chat'
+  const rawReq = truncateForLog(JSON.stringify({ messages }), 1000)
+
+  function writeUsageLog() {
+    const latMs = Date.now() - startMs
+    const promptTokens = usage?.prompt_tokens ?? 0
+    const completionTokens = usage?.completion_tokens ?? 0
+    dbQuery(
+      `INSERT INTO ai_usage_logs (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, error_msg, raw_request_truncated, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      [logId, userId, logModel, promptTokens, completionTokens, latMs, errorMsg, rawReq]
+    ).catch((err) => console.warn('[ai_usage_logs] 写入失败:', err.message))
+  }
+
+  try {
+    await streamChatCompletion(
+      messages,
+      { model, temperature, max_tokens },
+      (text) => {
+        res.write(`data: ${JSON.stringify({ content: text })}\n\n`)
+      },
+      (finalText, finalUsage) => {
+        success = true
+        usage = finalUsage
+        writeUsageLog()
+        res.write(`data: [DONE]\n\n`)
+        res.end()
+      }
+    )
+  } catch (e) {
+    errorMsg = String(e.message || e).slice(0, 500)
+    writeUsageLog()
+    res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`)
+    res.write(`data: [DONE]\n\n`)
+    res.end()
+  }
+
+  return true
+}
+
+async function handleGuestStart(req, res) {
+  const body = await readJsonBody(req)
+  let deviceId = body.deviceId || req.headers['x-device-id']
+  if (!deviceId) {
+    deviceId = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  }
+
+  let session
+  const { rows: existingRows } = await dbQuery(
+    `SELECT * FROM guest_sessions WHERE device_id = $1 LIMIT 1`,
+    [deviceId]
+  )
+
+  if (existingRows.length > 0) {
+    const existing = existingRows[0]
+    const { status: computedStatus } = computeGuestStatus(existing)
+
+    if (existing.status === 'bound' || computedStatus === 'expired' || existing.status === 'expired') {
+      await dbQuery(
+        `UPDATE guest_sessions SET status = 'active', started_at = NOW(), expires_at = NOW() + INTERVAL '300 seconds', remaining_seconds = 300, bound_user_id = NULL, updated_at = NOW() WHERE device_id = $1`,
+        [deviceId]
+      )
+    }
+    const { rows: updatedRows } = await dbQuery(
+      `SELECT * FROM guest_sessions WHERE device_id = $1 LIMIT 1`,
+      [deviceId]
+    )
+    session = updatedRows[0]
+  } else {
+    const id = `gs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+    await dbQuery(
+      `INSERT INTO guest_sessions (id, device_id, started_at, expires_at, status, bound_user_id, remaining_seconds) VALUES ($1, $2, NOW(), NOW() + INTERVAL '300 seconds', 'active', NULL, 300)`,
+      [id, deviceId]
+    )
+    const { rows: insertedRows } = await dbQuery(
+      `SELECT * FROM guest_sessions WHERE device_id = $1 LIMIT 1`,
+      [deviceId]
+    )
+    session = insertedRows[0]
+  }
+
+  const { remainingSeconds, status } = computeGuestStatus(session)
+  await dbQuery(
+    `UPDATE guest_sessions SET remaining_seconds = $1, status = $2, updated_at = NOW() WHERE device_id = $3`,
+    [remainingSeconds, status, deviceId]
+  )
+
+  return sendJson(res, 200, {
+    deviceId,
+    startedAt: toISO(session.started_at),
+    expiresAt: toISO(session.expires_at),
+    status,
+    remainingSeconds,
+  })
+}
+
+async function handleGuestPing(req, res, url) {
+  const deviceId = url.searchParams.get('device_id')
+  if (!deviceId) {
+    return sendJson(res, 400, { error: '缺少 device_id' })
+  }
+
+  const { rows } = await dbQuery(
+    `SELECT * FROM guest_sessions WHERE device_id = $1 LIMIT 1`,
+    [deviceId]
+  )
+  if (rows.length === 0) {
+    return sendJson(res, 404, { error: '会话不存在，请重新发起 start' })
+  }
+
+  const session = rows[0]
+  let remainingSeconds, status
+
+  if (session.bound_user_id) {
+    remainingSeconds = session.remaining_seconds ?? 300
+    status = 'bound'
+  } else {
+    const computed = computeGuestStatus(session)
+    remainingSeconds = computed.remainingSeconds
+    status = computed.status
+  }
+
+  await dbQuery(
+    `UPDATE guest_sessions SET remaining_seconds = $1, status = $2, updated_at = NOW() WHERE device_id = $3`,
+    [remainingSeconds, status, deviceId]
+  )
+
+  return sendJson(res, 200, {
+    deviceId,
+    startedAt: toISO(session.started_at),
+    expiresAt: toISO(session.expires_at),
+    status,
+    remainingSeconds,
+  })
+}
+
+async function handleGuestBind(req, res, authUser) {
+  const body = await readJsonBody(req)
+  const deviceId = body.deviceId
+  if (!deviceId) {
+    return sendJson(res, 400, { error: '缺少 deviceId' })
+  }
+
+  const { rows } = await dbQuery(
+    `SELECT * FROM guest_sessions WHERE device_id = $1 LIMIT 1`,
+    [deviceId]
+  )
+  if (rows.length === 0) {
+    return sendJson(res, 404, { error: '会话不存在' })
+  }
+
+  await dbQuery(
+    `UPDATE guest_sessions SET bound_user_id = $1, status = 'bound', remaining_seconds = 300, updated_at = NOW() WHERE device_id = $2`,
+    [authUser.userId, deviceId]
+  )
+
+  return sendJson(res, 200, { ok: true, deviceId, status: 'bound' })
+}
+
 /**
  * 用户列表：支持 status / role 筛选
  * role 筛选使用 = ANY(roles) 匹配数组元素（用户可有多个角色）
@@ -819,6 +1099,153 @@ async function handleGetUserStats(req, res, id) {
   return sendJson(res, 200, result)
 }
 
+const TTL_USER_PROFILE = 60
+
+function userProfileCacheKey(userId) {
+  return `af:user:profile:${userId}`
+}
+
+async function handleGetUserProfile(req, res, userId) {
+  const cacheKey = userProfileCacheKey(userId)
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
+
+  const { rows: userRows } = await dbQuery(
+    `SELECT id, username, nickname, avatar_text, bio, created_at, updated_at FROM users WHERE id = $1`,
+    [userId]
+  )
+  if (userRows.length === 0) {
+    return sendJson(res, 404, { error: '用户不存在' })
+  }
+  const user = userRows[0]
+
+  const [postCountRes, commentsCountRes, likesSumRes, favoritesCountRes] = await Promise.all([
+    dbQuery(`SELECT COUNT(*) FROM posts WHERE author_id = $1 AND status = 'published'`, [userId]),
+    dbQuery(`SELECT COUNT(*) FROM comments WHERE author_id = $1`, [userId]),
+    dbQuery(`SELECT COALESCE(SUM(likes), 0) FROM posts WHERE author_id = $1 AND status = 'published'`, [userId]),
+    dbQuery(`SELECT COUNT(*) FROM post_favorites WHERE user_id = $1`, [userId]),
+  ])
+
+  const postCount = parseInt(postCountRes.rows[0].count, 10)
+  const commentsCount = parseInt(commentsCountRes.rows[0].count, 10)
+  const likesSum = parseInt(likesSumRes.rows[0].coalesce, 10) || 0
+  const favoritesCount = parseInt(favoritesCountRes.rows[0].count, 10)
+  const influenceScore = Math.round((postCount * 3 + commentsCount * 1 + likesSum * 0.5) * 10) / 10
+
+  const result = {
+    id: user.id,
+    username: user.username,
+    nickname: user.nickname,
+    avatarText: user.avatar_text,
+    bio: user.bio,
+    createdAt: toISO(user.created_at),
+    updatedAt: toISO(user.updated_at),
+    postCount,
+    commentsCount,
+    likesSum,
+    favoritesCount,
+    influenceScore,
+  }
+
+  await cacheSet(cacheKey, result, TTL_USER_PROFILE)
+  return sendJson(res, 200, result)
+}
+
+async function handleGetUserPosts(req, res, userId, url) {
+  const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10))
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10))
+
+  const sql = `
+    SELECT p.*,
+           u.id AS u_id, u.nickname AS u_nickname, u.avatar_text AS u_avatar_text,
+           b.id AS b_id, b.name AS b_name, b.color AS b_color
+    FROM posts p
+    LEFT JOIN users u ON p.author_id = u.id
+    LEFT JOIN boards b ON p.board_id = b.id
+    WHERE p.author_id = $1 AND p.status = 'published'
+    ORDER BY p.created_at DESC
+    LIMIT $2 OFFSET $3
+  `
+  const { rows } = await dbQuery(sql, [userId, limit, offset])
+
+  const tagsByPost = new Map()
+  if (rows.length > 0) {
+    const postIds = rows.map((r) => r.id)
+    const tagRows = await dbQuery(
+      `SELECT post_id, tag_name FROM post_tags WHERE post_id = ANY($1::text[])`,
+      [postIds]
+    )
+    for (const tr of tagRows.rows) {
+      if (!tagsByPost.has(tr.post_id)) tagsByPost.set(tr.post_id, [])
+      tagsByPost.get(tr.post_id).push(tr.tag_name)
+    }
+  }
+
+  const result = rows.map((r) => mapPostRow(r, tagsByPost.get(r.id) || []))
+  return sendJson(res, 200, result)
+}
+
+async function handleGetUserFavorites(req, res, userId, url) {
+  const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10))
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10))
+
+  const sql = `
+    SELECT p.*,
+           u.id AS u_id, u.nickname AS u_nickname, u.avatar_text AS u_avatar_text,
+           b.id AS b_id, b.name AS b_name, b.color AS b_color
+    FROM post_favorites pf
+    JOIN posts p ON pf.post_id = p.id
+    LEFT JOIN users u ON p.author_id = u.id
+    LEFT JOIN boards b ON p.board_id = b.id
+    WHERE pf.user_id = $1 AND p.status = 'published'
+    ORDER BY pf.created_at DESC
+    LIMIT $2 OFFSET $3
+  `
+  const { rows } = await dbQuery(sql, [userId, limit, offset])
+
+  const tagsByPost = new Map()
+  if (rows.length > 0) {
+    const postIds = rows.map((r) => r.id)
+    const tagRows = await dbQuery(
+      `SELECT post_id, tag_name FROM post_tags WHERE post_id = ANY($1::text[])`,
+      [postIds]
+    )
+    for (const tr of tagRows.rows) {
+      if (!tagsByPost.has(tr.post_id)) tagsByPost.set(tr.post_id, [])
+      tagsByPost.get(tr.post_id).push(tr.tag_name)
+    }
+  }
+
+  const result = rows.map((r) => mapPostRow(r, tagsByPost.get(r.id) || []))
+  return sendJson(res, 200, result)
+}
+
+async function handleGetUserComments(req, res, userId, url) {
+  const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10))
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10))
+
+  const sql = `
+    SELECT c.id, c.post_id, c.content, c.likes, c.created_at, p.title AS post_title
+    FROM comments c
+    JOIN posts p ON c.post_id = p.id
+    WHERE c.author_id = $1
+    ORDER BY c.created_at DESC
+    LIMIT $2 OFFSET $3
+  `
+  const { rows } = await dbQuery(sql, [userId, limit, offset])
+
+  const result = rows.map((r) => ({
+    id: r.id,
+    postId: r.post_id,
+    postTitle: r.post_title,
+    content: r.content,
+    likes: r.likes,
+    createdAt: toISO(r.created_at),
+  }))
+
+  return sendJson(res, 200, result)
+}
+
 // === 认证端点 ===
 
 /**
@@ -859,6 +1286,13 @@ async function handleLogin(req, res) {
     roles: user.roles || [],
   })
   await createSession(user.id, jti, token)
+
+  if (body.deviceId) {
+    dbQuery(
+      `UPDATE guest_sessions SET bound_user_id = $1, status = 'bound', remaining_seconds = 300 WHERE device_id = $2`,
+      [user.id, body.deviceId]
+    ).catch(() => {})
+  }
 
   return sendJson(res, 200, { token, user: mapUser(user) })
 }
@@ -958,6 +1392,13 @@ async function handleRegister(req, res) {
     roles: user.roles || [],
   })
   await createSession(user.id, jti, token)
+
+  if (body.deviceId) {
+    dbQuery(
+      `UPDATE guest_sessions SET bound_user_id = $1, status = 'bound', remaining_seconds = 300 WHERE device_id = $2`,
+      [user.id, body.deviceId]
+    ).catch(() => {})
+  }
 
   return sendJson(res, 201, { token, user: mapUser(user) })
 }
@@ -1090,11 +1531,53 @@ async function matchForumRoute(req, res, pathname, method, url) {
       const id = decodeURIComponent(parts[1])
       if (parts.length === 2) {
         supportedMethods.push('GET')
-        if (method === 'GET') return await handleGetUser(req, res, id)
+        if (method === 'GET') return await handleGetUserProfile(req, res, id)
       }
       if (parts.length === 3 && parts[2] === 'stats') {
         supportedMethods.push('GET')
         if (method === 'GET') return await handleGetUserStats(req, res, id)
+      }
+      if (parts.length === 3 && parts[2] === 'posts') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleGetUserPosts(req, res, id, url)
+      }
+      if (parts.length === 3 && parts[2] === 'favorites') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleGetUserFavorites(req, res, id, url)
+      }
+      if (parts.length === 3 && parts[2] === 'comments') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleGetUserComments(req, res, id, url)
+      }
+    }
+
+    if (parts[0] === 'ai' && parts.length >= 2) {
+      if (parts[1] === 'health') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleAIHealth(req, res)
+      }
+      if (parts[1] === 'generate') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleAIGenerate)(req, res)
+      }
+      if (parts[1] === 'stream') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleAIStream)(req, res)
+      }
+    }
+
+    if (parts[0] === 'guest' && parts.length >= 2) {
+      if (parts[1] === 'start') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await handleGuestStart(req, res)
+      }
+      if (parts[1] === 'ping') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleGuestPing(req, res, url)
+      }
+      if (parts[1] === 'bind') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleGuestBind)(req, res)
       }
     }
 

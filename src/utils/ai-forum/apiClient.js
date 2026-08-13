@@ -288,10 +288,15 @@ export async function getUsers(params = {}) {
  * 成功后将 token 存入 localStorage
  * @param {string} username 用户名（支持 nickname 或 handle）
  * @param {string} password 密码
+ * @param {string} [deviceId] 访客设备 ID，用于后端登录时绑定访客会话（Task4 已支持）
  * @returns {Promise<{ok:boolean, data:any, error:string|null, status:number}>}
  */
-export async function login(username, password) {
-  const res = await request('POST', '/auth/login', undefined, { username, password })
+export async function login(username, password, deviceId) {
+  const body = { username, password }
+  // 附带 deviceId：后端 Task4 在登录成功后据此 UPDATE guests SET user_id = $1 WHERE device_id = $2
+  // 目的：登录后复用之前访客浏览记录，统一设备视角统计
+  if (deviceId) body.deviceId = deviceId
+  const res = await request('POST', '/auth/login', undefined, body)
   if (res.ok && res.data && res.data.token) {
     setToken(res.data.token)
   }
@@ -302,11 +307,15 @@ export async function login(username, password) {
  * 注册：POST /auth/register
  * 成功后将 token 存入 localStorage
  * @param {{nickname:string, email:string, password:string}} payload
+ * @param {string} [deviceId] 访客设备 ID，用于后端注册后自动绑定访客会话
  * @returns {Promise<{ok:boolean, data:any, error:string|null, status:number}>}
  */
-export async function register(payload) {
+export async function register(payload, deviceId) {
   const { nickname, email, password } = payload || {}
-  const res = await request('POST', '/auth/register', undefined, { nickname, email, password })
+  const body = { nickname, email, password }
+  // 同登录：附带 deviceId 让后端 UPDATE guests 绑定
+  if (deviceId) body.deviceId = deviceId
+  const res = await request('POST', '/auth/register', undefined, body)
   if (res.ok && res.data && res.data.token) {
     setToken(res.data.token)
   }
@@ -351,6 +360,238 @@ export async function getUserStats(userId) {
   return res.ok ? res.data : null
 }
 
+// === 搜索与用户多 Tab ===
+
+/**
+ * 搜索帖子
+ * @param {Object} params 查询参数
+ * @param {string} [params.keyword] 关键词
+ * @param {string} [params.boardId] 版块 id
+ * @param {string} [params.sort] 排序方式
+ * @param {number} [params.limit] 每页数量
+ * @param {number} [params.offset] 偏移量
+ * @returns {Promise<{items:Array, total:number}>}
+ */
+export async function searchPosts({ keyword, boardId, sort, limit, offset } = {}) {
+  const params = {}
+  if (keyword !== undefined && keyword !== null) {
+    params.search = encodeURIComponent(keyword)
+  }
+  if (boardId !== undefined && boardId !== null) params.boardId = boardId
+  if (sort !== undefined && sort !== null) params.sort = sort
+  if (limit !== undefined && limit !== null) params.limit = limit
+  if (offset !== undefined && offset !== null) params.offset = offset
+  const res = await request('GET', '/posts', params)
+  const data = res.data
+  if (data && Array.isArray(data.items)) {
+    return { items: data.items, total: typeof data.total === 'number' ? data.total : data.items.length }
+  }
+  if (Array.isArray(data)) {
+    return { items: data, total: data.length }
+  }
+  return { items: [], total: 0 }
+}
+
+/**
+ * 获取用户详情
+ * @param {string} userId 用户 id
+ * @returns {Promise<Object|null>}
+ */
+export async function getUserProfile(userId) {
+  if (!userId) return null
+  const res = await request('GET', `/users/${userId}`)
+  return res.ok ? res.data : null
+}
+
+/**
+ * 获取用户发布的帖子列表
+ * @param {string} userId 用户 id
+ * @param {Object} [params] 分页参数
+ * @returns {Promise<Array>}
+ */
+export async function getUserPosts(userId, { limit, offset } = {}) {
+  if (!userId) return []
+  const params = {}
+  if (limit !== undefined && limit !== null) params.limit = limit
+  if (offset !== undefined && offset !== null) params.offset = offset
+  const res = await request('GET', `/users/${userId}/posts`, params)
+  return Array.isArray(res.data) ? res.data : []
+}
+
+/**
+ * 获取用户收藏的帖子列表
+ * @param {string} userId 用户 id
+ * @param {Object} [params] 分页参数
+ * @returns {Promise<Array>}
+ */
+export async function getUserFavorites(userId, { limit, offset } = {}) {
+  if (!userId) return []
+  const params = {}
+  if (limit !== undefined && limit !== null) params.limit = limit
+  if (offset !== undefined && offset !== null) params.offset = offset
+  const res = await request('GET', `/users/${userId}/favorites`, params)
+  return Array.isArray(res.data) ? res.data : []
+}
+
+/**
+ * 获取用户发表的评论列表
+ * @param {string} userId 用户 id
+ * @param {Object} [params] 分页参数
+ * @returns {Promise<Array>}
+ */
+export async function getUserComments(userId, { limit, offset } = {}) {
+  if (!userId) return []
+  const params = {}
+  if (limit !== undefined && limit !== null) params.limit = limit
+  if (offset !== undefined && offset !== null) params.offset = offset
+  const res = await request('GET', `/users/${userId}/comments`, params)
+  return Array.isArray(res.data) ? res.data : []
+}
+
+// === Guest 会话 ===
+
+/**
+ * 访客会话启动
+ * @param {string} [deviceId] 设备 id
+ * @returns {Promise<Object|null>}
+ */
+export async function guestStart(deviceId) {
+  const body = deviceId ? { deviceId } : {}
+  const res = await request('POST', '/guest/start', undefined, body)
+  return res.ok ? res.data : null
+}
+
+/**
+ * 访客心跳
+ * @param {string} [deviceId] 设备 id
+ * @returns {Promise<Object|null>}
+ */
+export async function guestPing(deviceId) {
+  if (!deviceId) return Promise.resolve(null)
+  const res = await request('GET', '/guest/ping', { device_id: encodeURIComponent(deviceId) })
+  return res.ok ? res.data : null
+}
+
+/**
+ * 访客绑定到当前登录用户
+ * @param {string} deviceId 设备 id
+ * @returns {Promise<{ok:boolean, status?:string, error?:string}>}
+ */
+export async function guestBind(deviceId) {
+  if (!deviceId) return { ok: false, error: '缺少 deviceId' }
+  const res = await request('POST', '/guest/bind', undefined, { deviceId })
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, status: res.data?.status }
+}
+
+// === AI 相关 ===
+
+/**
+ * AI 服务健康检查
+ * @returns {Promise<any>}
+ */
+export async function aiHealth() {
+  const res = await request('GET', '/ai/health')
+  return res.data
+}
+
+/**
+ * AI 生成（非流式）
+ * @param {Object} params
+ * @param {Array} params.messages
+ * @param {string} [params.model]
+ * @param {number} [params.temperature]
+ * @param {number} [params.maxTokens]
+ * @returns {Promise<{content:string, from_llm:boolean, usage:Object, ok?:boolean, error?:string}>}
+ */
+export async function aiGenerate({ messages, model, temperature, maxTokens }) {
+  const body = { messages }
+  if (model !== undefined && model !== null) body.model = model
+  if (temperature !== undefined && temperature !== null) body.temperature = temperature
+  if (maxTokens !== undefined && maxTokens !== null) body.max_tokens = maxTokens
+  const res = await request('POST', '/ai/generate', undefined, body)
+  if (!res.ok) return { ok: false, error: res.error }
+  return res.data
+}
+
+/**
+ * AI 流式生成（SSE）
+ * @param {Object} params
+ * @param {Array} params.messages
+ * @param {string} [params.model]
+ * @param {number} [params.temperature]
+ * @param {number} [params.maxTokens]
+ * @param {Function} onChunk 每接收到一段 content 的回调
+ * @returns {Promise<void>}
+ */
+export async function aiStream({ messages, model, temperature, maxTokens }, onChunk) {
+  const body = { messages }
+  if (model !== undefined && model !== null) body.model = model
+  if (temperature !== undefined && temperature !== null) body.temperature = temperature
+  if (maxTokens !== undefined && maxTokens !== null) body.max_tokens = maxTokens
+
+  const token = getToken()
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'text/event-stream',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(`${BASE_URL}/ai/stream`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    let errMsg = `HTTP ${res.status}`
+    try {
+      const raw = await res.text()
+      try {
+        const json = JSON.parse(raw)
+        if (json && json.error) errMsg = json.error
+      } catch {}
+    } catch {}
+    throw new Error(errMsg)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      let boundary
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const rawSegment = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+        const lines = rawSegment.split('\n')
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const dataStr = line.slice(5).trim()
+          if (!dataStr) continue
+          if (dataStr === '[DONE]') return
+          try {
+            const parsed = JSON.parse(dataStr)
+            if (parsed && typeof parsed.content === 'string' && onChunk) {
+              onChunk(parsed.content)
+            }
+          } catch {
+          }
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock()
+    } catch {}
+  }
+}
+
 // === 健康检查 ===
 
 /**
@@ -383,4 +624,15 @@ export default {
   register,
   logout,
   getMe,
+  searchPosts,
+  getUserProfile,
+  getUserPosts,
+  getUserFavorites,
+  getUserComments,
+  guestStart,
+  guestPing,
+  guestBind,
+  aiHealth,
+  aiGenerate,
+  aiStream,
 }

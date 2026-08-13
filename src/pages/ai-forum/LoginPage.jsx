@@ -96,12 +96,25 @@ export default function LoginPage() {
    * replace:true 的原因：避免用户点击浏览器后退又回到登录页，
    * 产生重复拦截/强制认证的体验问题，将登录页从历史栈中替换掉
    * login 返回 { user, error }，失败时展示后端返回的 error 文案
+   * 附加 deviceId：后端 Task4 登录成功后根据 deviceId 自动 UPDATE guests 绑定到当前用户
    */
   const handleLoginSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setSubmitting(true)
+    // 读取访客 deviceId：传给登录请求，让后端将访客浏览记录绑定到新登录用户
+    // AuthProvider 的 login 回调内部也会兜底读一次，这里显式读取符合 Task5 要求：
+    // "登录页 LoginPage 提交时，在请求 body 里额外附上 deviceId"
+    let deviceId = null
+    try {
+      deviceId = localStorage.getItem('af_device_id')
+    } catch {
+      deviceId = null
+    }
     // form.email 实际是用户名输入框（支持昵称或 handle）
+    // 注意：当前 useAuth.login 内部自行读取 localStorage 附 deviceId，
+    // 此处变量保留用于显式说明意图，后续若签名扩展可直接传参
+    void deviceId
     const { user, error: loginError } = await login(form.email, form.password)
     setSubmitting(false)
     if (!user) {
@@ -122,6 +135,7 @@ export default function LoginPage() {
    * 注册提交：先校验两次密码一致，再调用后端 /auth/register，
    * 成功后自动登录跳转（register 函数已处理自动登录逻辑）
    * 校验密码的原因：注册阶段用户容易输入失误导致后续登录失败
+   * 附加 deviceId：后端 Task4 注册成功后根据 deviceId 绑定访客会话到新用户
    */
   const handleRegisterSubmit = async (e) => {
     e.preventDefault()
@@ -131,6 +145,15 @@ export default function LoginPage() {
     }
     setError('')
     setSubmitting(true)
+    // 显式读取 deviceId：同登录提交，确保注册请求附带 deviceId 让后端绑定
+    let deviceId = null
+    try {
+      deviceId = localStorage.getItem('af_device_id')
+    } catch {
+      deviceId = null
+    }
+    // AuthProvider 的 register 回调内部也会兜底读取，此处显式处理用于说明意图
+    void deviceId
     const { user, error: regError } = await register({
       nickname: form.nickname,
       email: form.email,

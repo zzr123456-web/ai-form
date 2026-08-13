@@ -14,6 +14,7 @@
     "db:migrate": "node scripts/migrate-auth.mjs",
     "db:migrate-users": "node scripts/migrate-users.mjs",
     "db:migrate-interactions": "node scripts/migrate-interactions.mjs",
+    "db:migrate-phase1": "node scripts/migrate-phase1.mjs",
     "db:update-users": "node scripts/update-users.mjs"
   },
   "dependencies": {

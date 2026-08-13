@@ -144,7 +144,15 @@ export function AuthProvider({ children }) {
    * @returns {Promise<{user:Object|null, error:string|null}>} 成功返回 user，失败返回 error
    */
   const login = useCallback(async (username, password) => {
-    const res = await apiLogin(username, password)
+    // 读取访客 deviceId：存在则一并传给后端，让后端登录时绑定该设备的访客会话
+    // 目的：登录后复用游客浏览记录，统一设备视角统计（Task4 后端已支持）
+    let deviceId = null
+    try {
+      deviceId = localStorage.getItem('af_device_id')
+    } catch {
+      deviceId = null
+    }
+    const res = await apiLogin(username, password, deviceId || undefined)
     if (res.ok && res.data && res.data.user) {
       setUser(res.data.user)
       try {
@@ -166,7 +174,14 @@ export function AuthProvider({ children }) {
    * @returns {Promise<{user:Object|null, error:string|null}>}
    */
   const register = useCallback(async (payload) => {
-    const res = await apiRegister(payload)
+    // 同 login：读取 deviceId 一并传递，注册成功后直接绑定访客会话
+    let deviceId = null
+    try {
+      deviceId = localStorage.getItem('af_device_id')
+    } catch {
+      deviceId = null
+    }
+    const res = await apiRegister(payload, deviceId || undefined)
     if (res.ok && res.data && res.data.user) {
       setUser(res.data.user)
       try {

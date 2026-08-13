@@ -180,6 +180,32 @@ CREATE TABLE IF NOT EXISTS comment_likes (
     ON DELETE CASCADE
 );
 
+-- 13. 访客会话表
+CREATE TABLE IF NOT EXISTS guest_sessions (
+  id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL UNIQUE,
+  started_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expiring','expired','bound')),
+  bound_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  remaining_seconds INTEGER NOT NULL DEFAULT 300,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 14. AI 使用日志表
+CREATE TABLE IF NOT EXISTS ai_usage_logs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  model TEXT NOT NULL DEFAULT 'deepseek-chat',
+  prompt_tokens INTEGER DEFAULT 0,
+  completion_tokens INTEGER DEFAULT 0,
+  latency_ms INTEGER DEFAULT 0,
+  error_msg TEXT,
+  raw_request_truncated TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ============================================================
 -- 索引（覆盖高频查询路径）
 -- ============================================================
@@ -194,3 +220,7 @@ CREATE INDEX IF NOT EXISTS idx_post_favorites_user_id ON post_favorites(user_id)
 CREATE INDEX IF NOT EXISTS idx_comment_likes_user_id ON comment_likes(user_id);
 -- 新增：评论作者索引（用于"我的评论"查询）
 CREATE INDEX IF NOT EXISTS idx_comments_author_id ON comments(author_id);
+-- 新增：访客会话与 AI 使用日志索引
+CREATE INDEX IF NOT EXISTS idx_guest_sessions_device_id ON guest_sessions(device_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_user_id ON ai_usage_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created_at ON ai_usage_logs(created_at);

@@ -51,8 +51,8 @@ export function userStatsKey(id) {
  * @param {number} page 页码
  * @param {number} limit 每页数量
  */
-export function postListKey(sort, boardId, tag, page, limit) {
-  return `af:posts:list:${sort || 'latest'}:${boardId || 'all'}:${tag || 'all'}:${page}:${limit}`
+export function postListKey(sort, boardId, tag, page, limit, search) {
+  return `af:posts:list:${sort || 'latest'}:${boardId || 'all'}:${tag || 'all'}:${search || 'all'}:${page}:${limit}`
 }
 
 /** 帖子详情 key */

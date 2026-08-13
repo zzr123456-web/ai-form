@@ -43,6 +43,17 @@ export function formatTimer(seconds) {
 }
 
 /**
+ * 秒数格式化为 MM:SS（如 2:33）
+ * 与 formatTimer 实现一致，单独导出用于访客倒计时黄条展示，
+ * 语义更明确，方便后续如有格式调整时仅改此函数
+ */
+export function formatSeconds(s) {
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return `${m}:${String(sec).padStart(2, '0')}`
+}
+
+/**
  * 字符串截断（摘要兜底使用，即便有 CSS line-clamp 也提供 JS 层保证）
  * text 非字符串时兜底返回空字符串
  */
