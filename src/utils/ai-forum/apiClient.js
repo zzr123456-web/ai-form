@@ -41,21 +41,21 @@ function removeToken() {
  * 内部统一请求封装
  * - GET：params 拼接为 query string
  * - POST/PUT：body 转 JSON
- * - 网络错误或非 2xx 响应时返回 null，由调用方根据语义决定兜底值
+ * - 返回 { ok, data, error, status } 完整结构，调用方据此判断
+ *   - ok=true: data 为解析后的 JSON
+ *   - ok=false: error 为错误说明字符串，status 为 HTTP 码
  * @param {string} method HTTP 方法
  * @param {string} path 路径（不含 BASE_URL）
  * @param {Object} [params] GET 查询参数
  * @param {Object} [body] POST/PUT 请求体
- * @returns {Promise<Object|null>} 解析后的 JSON，失败返回 null
+ * @returns {Promise<{ok:boolean, data:any, error:string|null, status:number}>}
  */
 async function request(method, path, params, body) {
   try {
-    // 构造 URL：仅在 params 非空时拼接 query string，避免出现多余的「?」
     let url = `${BASE_URL}${path}`
     if (params && Object.keys(params).length > 0) {
       const qs = new URLSearchParams()
       Object.entries(params).forEach(([k, v]) => {
-        // 过滤 undefined / null / 空字符串，避免发送无意义参数
         if (v !== undefined && v !== null && v !== '') {
           qs.set(k, v)
         }
@@ -65,34 +65,50 @@ async function request(method, path, params, body) {
     }
 
     const headers = { 'Content-Type': 'application/json' }
-    // 自动注入 Authorization 头（若 token 存在）
     const token = getToken()
     if (token) {
       headers.Authorization = `Bearer ${token}`
     }
 
     const options = { method, headers }
-    // 仅 POST/PUT 携带请求体，避免 GET 请求误带 body 触发部分代理告警
     if (body !== undefined && body !== null && (method === 'POST' || method === 'PUT')) {
       options.body = JSON.stringify(body)
     }
 
     const res = await fetch(url, options)
-    // 401 统一处理：清除 token + 触发全局过期事件（AuthProvider 监听）
+
+    // 先解析响应体（无论成功失败都尝试解析 error 字段）
+    let payload = null
+    const rawText = await res.text()
+    try {
+      payload = rawText ? JSON.parse(rawText) : null
+    } catch {
+      payload = null
+    }
+
+    // 401 统一处理：清除 token + 触发全局过期事件
     if (res.status === 401) {
       removeToken()
       window.dispatchEvent(new Event('auth:expired'))
-      return null
+      return {
+        ok: false,
+        data: null,
+        error: (payload && payload.error) || '登录已过期，请重新登录',
+        status: res.status,
+      }
     }
+
     if (!res.ok) {
-      console.warn(`[apiClient] ${method} ${path} 失败: HTTP ${res.status}`)
-      return null
+      const errorMsg = (payload && payload.error) || `HTTP ${res.status}`
+      console.warn(`[apiClient] ${method} ${path} 失败: ${errorMsg}`)
+      return { ok: false, data: null, error: errorMsg, status: res.status }
     }
-    return await res.json()
+
+    return { ok: true, data: payload, error: null, status: res.status }
   } catch (err) {
-    // 网络错误（如后端未启动、代理失败）兜底，避免前端页面整体崩溃
-    console.warn(`[apiClient] ${method} ${path} 网络错误:`, err?.message || err)
-    return null
+    const errorMsg = err?.message || String(err)
+    console.warn(`[apiClient] ${method} ${path} 网络错误:`, errorMsg)
+    return { ok: false, data: null, error: errorMsg, status: 0 }
   }
 }
 
@@ -101,22 +117,17 @@ async function request(method, path, params, body) {
 /**
  * 获取帖子列表
  * @param {Object} [params] 查询参数
- * @param {string} [params.sort] 排序方式
- * @param {string} [params.boardId] 版块 id
- * @param {string} [params.tag] 标签
- * @param {number} [params.page] 页码
- * @param {number} [params.limit] 每页数量
  * @returns {Promise<Array>} 帖子数组，失败返回 []
  */
 export async function getPosts(params = {}) {
-  const data = await request('GET', '/posts', {
+  const res = await request('GET', '/posts', {
     sort: params.sort,
     boardId: params.boardId,
     tag: params.tag,
     page: params.page,
     limit: params.limit,
   })
-  // 后端可能返回数组或 { items: [] } 结构，这里做轻量兼容兜底
+  const data = res.data
   if (Array.isArray(data)) return data
   if (data && Array.isArray(data.items)) return data.items
   return []
@@ -129,7 +140,8 @@ export async function getPosts(params = {}) {
  */
 export async function getPost(id) {
   if (!id) return null
-  return await request('GET', `/posts/${id}`)
+  const res = await request('GET', `/posts/${id}`)
+  return res.ok ? res.data : null
 }
 
 /**
@@ -138,7 +150,7 @@ export async function getPost(id) {
  * @returns {Promise<Object|null>} 新建帖子，失败返回 null
  */
 export async function createPost(payload = {}) {
-  return await request('POST', '/posts', undefined, {
+  const res = await request('POST', '/posts', undefined, {
     title: payload.title,
     content: payload.content,
     boardId: payload.boardId,
@@ -146,6 +158,7 @@ export async function createPost(payload = {}) {
     summary: payload.summary,
     authorId: payload.authorId,
   })
+  return res.ok ? res.data : null
 }
 
 // === 评论相关 ===
@@ -157,8 +170,8 @@ export async function createPost(payload = {}) {
  */
 export async function getComments(postId) {
   if (!postId) return []
-  const data = await request('GET', `/posts/${postId}/comments`)
-  return Array.isArray(data) ? data : []
+  const res = await request('GET', `/posts/${postId}/comments`)
+  return Array.isArray(res.data) ? res.data : []
 }
 
 // === 版块与话题 ===
@@ -168,8 +181,8 @@ export async function getComments(postId) {
  * @returns {Promise<Array>} 版块数组，失败返回 []
  */
 export async function getBoards() {
-  const data = await request('GET', '/boards')
-  return Array.isArray(data) ? data : []
+  const res = await request('GET', '/boards')
+  return Array.isArray(res.data) ? res.data : []
 }
 
 /**
@@ -177,8 +190,8 @@ export async function getBoards() {
  * @returns {Promise<Array>} 话题数组，失败返回 []
  */
 export async function getTopics() {
-  const data = await request('GET', '/topics')
-  return Array.isArray(data) ? data : []
+  const res = await request('GET', '/topics')
+  return Array.isArray(res.data) ? res.data : []
 }
 
 // === 用户相关 ===
@@ -186,34 +199,46 @@ export async function getTopics() {
 /**
  * 获取用户列表
  * @param {Object} [params] 筛选参数
- * @param {string} [params.status] 用户状态
- * @param {string} [params.role] 用户角色
  * @returns {Promise<Array>} 用户数组，失败返回 []
  */
 export async function getUsers(params = {}) {
-  const data = await request('GET', '/users', {
+  const res = await request('GET', '/users', {
     status: params.status,
     role: params.role,
   })
-  return Array.isArray(data) ? data : []
+  return Array.isArray(res.data) ? res.data : []
 }
 
 // === 认证相关 ===
 
 /**
  * 登录：POST /auth/login
- * 成功后将 token 存入 localStorage，返回 user 对象
+ * 成功后将 token 存入 localStorage
  * @param {string} username 用户名（支持 nickname 或 handle）
  * @param {string} password 密码
- * @returns {Promise<{token: string, user: Object}|null>}
+ * @returns {Promise<{ok:boolean, data:any, error:string|null, status:number}>}
  */
 export async function login(username, password) {
-  const data = await request('POST', '/auth/login', undefined, { username, password })
-  if (data && data.token) {
-    setToken(data.token)
-    return data
+  const res = await request('POST', '/auth/login', undefined, { username, password })
+  if (res.ok && res.data && res.data.token) {
+    setToken(res.data.token)
   }
-  return null
+  return res
+}
+
+/**
+ * 注册：POST /auth/register
+ * 成功后将 token 存入 localStorage
+ * @param {{nickname:string, email:string, password:string}} payload
+ * @returns {Promise<{ok:boolean, data:any, error:string|null, status:number}>}
+ */
+export async function register(payload) {
+  const { nickname, email, password } = payload || {}
+  const res = await request('POST', '/auth/register', undefined, { nickname, email, password })
+  if (res.ok && res.data && res.data.token) {
+    setToken(res.data.token)
+  }
+  return res
 }
 
 /**
@@ -227,18 +252,16 @@ export async function logout() {
 
 /**
  * 获取当前登录用户：GET /auth/me
- * 需携带有效 token（request 函数自动注入）
  * @returns {Promise<Object|null>}
  */
 export async function getMe() {
-  const data = await request('GET', '/auth/me')
-  if (data && data.user) return data.user
+  const res = await request('GET', '/auth/me')
+  if (res.ok && res.data && res.data.user) return res.data.user
   return null
 }
 
 /**
  * 获取当前登录用户
- * 改为调用 /auth/me，基于 token 验证身份（不再硬编码 u_alex）
  * @returns {Promise<Object|null>}
  */
 export async function getCurrentUser() {
@@ -252,7 +275,8 @@ export async function getCurrentUser() {
  */
 export async function getUserStats(userId) {
   if (!userId) return null
-  return await request('GET', `/users/${userId}/stats`)
+  const res = await request('GET', `/users/${userId}/stats`)
+  return res.ok ? res.data : null
 }
 
 // === 健康检查 ===
@@ -262,10 +286,11 @@ export async function getUserStats(userId) {
  * @returns {Promise<{db:string,ts:string}|null>} 健康状态对象，失败返回 null
  */
 export async function getHealth() {
-  return await request('GET', '/health')
+  const res = await request('GET', '/health')
+  return res.ok ? res.data : null
 }
 
-// 默认导出：聚合所有方法，便于 import apiClient from '@/utils/ai-forum/apiClient' 后统一调用
+// 默认导出：聚合所有方法
 export default {
   getPosts,
   getPost,
@@ -278,6 +303,7 @@ export default {
   getUserStats,
   getHealth,
   login,
+  register,
   logout,
   getMe,
 }

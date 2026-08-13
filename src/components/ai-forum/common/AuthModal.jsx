@@ -4,10 +4,19 @@ import { X, Mail, Lock, User, Code2, Globe, ShieldCheck, AlertTriangle } from 'l
 import { useAuth } from '../AuthProvider.jsx'
 
 export default function AuthModal() {
-  const { authModal, closeAuthModal, login, guestStatus, isAuthenticated } = useAuth()
+  const { authModal, closeAuthModal, login, register, guestStatus, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState({ nickname: '', email: '', password: '' })
+  // 异步提交中：防止重复点击
+  const [submitting, setSubmitting] = useState(false)
+  // 错误提示：展示后端返回的 error 字段
+  const [error, setError] = useState('')
+
+  // 弹窗打开或切换 Tab 时清空错误，避免历史错误误导用户
+  useEffect(() => {
+    setError('')
+  }, [authModal.open, mode])
 
   // 已登录状态下弹窗打开时直接关闭：避免异常状态残留
   useEffect(() => {
@@ -31,18 +40,45 @@ export default function AuthModal() {
 
   /**
    * 登录/注册表单提交
-   * - 注册模式：使用昵称作为 username（后端同时支持 nickname/handle）
-   * - 登录模式：使用邮箱作为 username
-   * 注意：login 失败返回 null 时，调用方（AuthProvider）不处理提示，
-   * 这里临时使用简单的错误展示（真实产品会有更完善的表单校验反馈）
+   * - 注册模式：调用 register(nickname, email, password)，创建新用户后自动登录
+   * - 登录模式：调用 login(username=email, password)，邮箱或昵称二选一支持
+   * - 结果展示后端返回的 error 文案，便于用户理解失败原因
    */
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const username = mode === 'register' ? form.nickname : form.email
-    if (!username || !form.password) return
-    const result = await login(username, form.password)
-    if (!result) {
-      // 登录失败：简单重置密码字段，用户可重试
+    setError('')
+    setSubmitting(true)
+
+    if (mode === 'register') {
+      if (!form.nickname || !form.email || !form.password) {
+        setSubmitting(false)
+        setError('请完善注册信息（昵称、邮箱、密码）')
+        return
+      }
+      const { user, error: regError } = await register({
+        nickname: form.nickname,
+        email: form.email,
+        password: form.password,
+      })
+      setSubmitting(false)
+      if (!user) {
+        setError(regError || '注册失败，请稍后重试')
+        setForm((f) => ({ ...f, password: '' }))
+      }
+      return
+    }
+
+    // 登录模式：优先用邮箱，邮箱为空时降级用昵称
+    const username = form.email || form.nickname
+    if (!username || !form.password) {
+      setSubmitting(false)
+      setError('请输入用户名和密码')
+      return
+    }
+    const { user, error: loginError } = await login(username, form.password)
+    setSubmitting(false)
+    if (!user) {
+      setError(loginError || '用户名或密码错误')
       setForm((f) => ({ ...f, password: '' }))
     }
   }
@@ -102,17 +138,28 @@ export default function AuthModal() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
+            {error ? (
+              <div className="flex items-start gap-2 rounded-af-md bg-error-bg p-3 text-sm text-error">
+                <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            ) : null}
+
             {mode === 'register' ? (
               <Field icon={User} placeholder="昵称" value={form.nickname}
                 onChange={(v) => setForm((f) => ({ ...f, nickname: v }))} />
             ) : null}
-            <Field icon={Mail} type="email" placeholder="邮箱" value={form.email}
+            <Field icon={Mail} type="email" placeholder="邮箱（登录时可用邮箱或昵称）" value={form.email}
               onChange={(v) => setForm((f) => ({ ...f, email: v }))} />
             <Field icon={Lock} type="password" placeholder="密码" value={form.password}
               onChange={(v) => setForm((f) => ({ ...f, password: v }))} />
 
-            <button type="submit" className="w-full h-10 rounded-af-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
-              {mode === 'login' ? '登录' : '注册并登录'}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full h-10 rounded-af-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? '提交中…' : mode === 'login' ? '登录' : '注册并登录'}
             </button>
           </form>
 
@@ -121,10 +168,10 @@ export default function AuthModal() {
               <span className="flex-1 h-px bg-border" />第三方登录<span className="flex-1 h-px bg-border" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={login} className="flex items-center justify-center gap-2 h-9 rounded-af-md border border-border bg-card text-sm text-foreground hover:bg-afmuted transition-colors">
+              <button type="button" className="flex items-center justify-center gap-2 h-9 rounded-af-md border border-border bg-card text-sm text-foreground hover:bg-afmuted transition-colors">
                 <Code2 className="size-4" /> GitHub
               </button>
-              <button type="button" onClick={login} className="flex items-center justify-center gap-2 h-9 rounded-af-md border border-border bg-card text-sm text-foreground hover:bg-afmuted transition-colors">
+              <button type="button" className="flex items-center justify-center gap-2 h-9 rounded-af-md border border-border bg-card text-sm text-foreground hover:bg-afmuted transition-colors">
                 <Globe className="size-4" /> Google
               </button>
             </div>

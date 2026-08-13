@@ -9,6 +9,7 @@
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { query as dbQuery, pool as dbPool, healthCheck as dbHealthCheck } from './db/pool.js'
@@ -18,7 +19,7 @@ import {
   postListKey, postKey, commentsKey,
   TTL_BOARDS, TTL_TOPICS, TTL_USERS, TTL_STATS, TTL_POSTS, TTL_POST_DETAIL, TTL_COMMENTS,
 } from './utils/cache.js'
-import { verifyPassword, signToken, createSession, destroySession } from './utils/auth.js'
+import { verifyPassword, hashPassword, signToken, createSession, destroySession } from './utils/auth.js'
 import { authenticate, requireAuth } from './utils/middleware.js'
 
 dotenv.config()
@@ -543,6 +544,103 @@ async function handleLogin(req, res) {
 }
 
 /**
+ * 注册：创建新用户（nickname + email 唯一校验），成功后直接签发 JWT
+ * - 用户名：nickname，显示用
+ * - 用户 handle：自动生成（取 nickname 首字母，重复则加 4 位随机字符）
+ * - 密码：使用 bcrypt 哈希后存储
+ * - 注册成功后自动登录，省去用户二次操作
+ */
+async function handleRegister(req, res) {
+  const body = await readJsonBody(req)
+  const { nickname, email, password } = body
+  if (!nickname || !email || !password) {
+    return sendJson(res, 400, { error: '请完善注册信息（昵称、邮箱、密码）' })
+  }
+
+  // 校验字段格式
+  if (nickname.length < 2 || nickname.length > 20) {
+    return sendJson(res, 400, { error: '昵称长度需在 2-20 字符之间' })
+  }
+  if (password.length < 6) {
+    return sendJson(res, 400, { error: '密码至少 6 位' })
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return sendJson(res, 400, { error: '邮箱格式不正确' })
+  }
+
+  // 检查 nickname 或 email 是否已存在
+  const { rows: existing } = await dbQuery(
+    `SELECT nickname, email FROM users WHERE nickname = $1 OR email = $2`,
+    [nickname, email]
+  )
+  if (existing.length > 0) {
+    const usedFields = existing.map((r) => {
+      if (r.nickname === nickname && r.email === email) return '昵称和邮箱'
+      if (r.nickname === nickname) return '昵称'
+      return '邮箱'
+    }).join(' + ')
+    return sendJson(res, 409, { error: `${usedFields} 已被占用，请换一个` })
+  }
+
+  // 生成 handle：基于 nickname 转 ASCII 后截断，冲突则追加随机后缀
+  function generateHandle(nick) {
+    const base = nick
+      .normalize('NFKD').replace(/[\u0300-\u036f]/g, '') // 去除中文声调标记
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '') // 仅保留小写字母数字
+      .slice(0, 10)
+    if (base.length >= 3) {
+      const rand = Math.random().toString(36).slice(2, 6)
+      return `u_${base}_${rand}`
+    }
+    const rand = Math.random().toString(36).slice(2, 8)
+    return `u_${rand}`
+  }
+
+  let handle = generateHandle(nickname)
+  // handle 唯一校验：冲突时重试最多 5 次，失败则追加 UUID 片段
+  for (let i = 0; i < 5; i++) {
+    const { rows: handleCheck } = await dbQuery(`SELECT id FROM users WHERE handle = $1`, [handle])
+    if (handleCheck.length === 0) break
+    handle = generateHandle(nickname)
+  }
+
+  // 密码哈希后写入
+  const passwordHash = hashPassword(password)
+  const userId = crypto.randomUUID()
+  try {
+    await dbQuery(
+      `INSERT INTO users (id, nickname, handle, email, password_hash, status, roles, avatar_url, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'active', ARRAY[]::VARCHAR[], '', NOW(), NOW())`,
+      [userId, nickname, handle, email, passwordHash]
+    )
+  } catch (err) {
+    console.error('[register] 插入用户失败:', err.message)
+    return sendJson(res, 500, { error: '注册失败，请稍后重试' })
+  }
+
+  // 缓存失效：用户列表变更，清除对应 key
+  await cacheDel(userListKey())
+
+  // 查询新建的用户用于返回
+  const { rows: inserted } = await dbQuery(`SELECT * FROM users WHERE id = $1`, [userId])
+  if (inserted.length === 0) {
+    return sendJson(res, 500, { error: '注册后查询用户失败' })
+  }
+  const user = inserted[0]
+
+  // 注册成功直接登录：签发 JWT + 创建 Session
+  const { token, jti } = signToken({
+    userId: user.id,
+    nickname: user.nickname,
+    roles: user.roles || [],
+  })
+  await createSession(user.id, jti, token)
+
+  return sendJson(res, 201, { token, user: mapUser(user) })
+}
+
+/**
  * 登出：删除 Redis session，使 token 失效
  * requireAuth 包装，需携带有效 token
  */
@@ -611,6 +709,10 @@ async function matchForumRoute(req, res, pathname, method, url) {
     if (sub === '/auth/login') {
       supportedMethods.push('POST')
       if (method === 'POST') return await handleLogin(req, res)
+    }
+    if (sub === '/auth/register') {
+      supportedMethods.push('POST')
+      if (method === 'POST') return await handleRegister(req, res)
     }
     if (sub === '/auth/logout') {
       supportedMethods.push('POST')

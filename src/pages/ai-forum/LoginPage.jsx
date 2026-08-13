@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../../components/ai-forum/AuthProvider.jsx'
 
 export default function LoginPage() {
-  const { login, guestStatus, setLoginRedirect } = useAuth()
+  const { login, register, guestStatus, setLoginRedirect } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   // 来源标记：timeout / editor / post_xxx / 其他
@@ -95,21 +95,20 @@ export default function LoginPage() {
    * 登录提交处理：异步调用 login()，成功后跳转目标页
    * replace:true 的原因：避免用户点击浏览器后退又回到登录页，
    * 产生重复拦截/强制认证的体验问题，将登录页从历史栈中替换掉
-   * login 返回 null 视为失败（如后端不可用），展示错误提示并停留在登录页
+   * login 返回 { user, error }，失败时展示后端返回的 error 文案
    */
   const handleLoginSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setSubmitting(true)
     // form.email 实际是用户名输入框（支持昵称或 handle）
-    const loaded = await login(form.email, form.password)
+    const { user, error: loginError } = await login(form.email, form.password)
     setSubmitting(false)
-    if (!loaded) {
-      setError('登录失败，请检查用户名和密码')
+    if (!user) {
+      setError(loginError || '登录失败，请检查用户名和密码')
       return
     }
     const target = resolveRedirect(from)
-    // timeout 场景：先尝试 navigate(-1) 回上一页，若栈为空则 fallback 目标页
     if (from === 'timeout') {
       if (window.history.length > 1) {
         navigate(-1)
@@ -120,9 +119,9 @@ export default function LoginPage() {
   }
 
   /**
-   * 注册提交：先校验两次密码一致，再异步自动登录跳转
-   * 校验密码的原因：注册阶段用户容易输入失误导致后续登录失败，
-   * 在这里拦截可以避免「注册成功但记不清密码」的 Mock 场景问题
+   * 注册提交：先校验两次密码一致，再调用后端 /auth/register，
+   * 成功后自动登录跳转（register 函数已处理自动登录逻辑）
+   * 校验密码的原因：注册阶段用户容易输入失误导致后续登录失败
    */
   const handleRegisterSubmit = async (e) => {
     e.preventDefault()
@@ -132,10 +131,15 @@ export default function LoginPage() {
     }
     setError('')
     setSubmitting(true)
-    const loaded = await login(form.email, form.password)
+    const { user, error: regError } = await register({
+      nickname: form.nickname,
+      email: form.email,
+      password: form.password,
+    })
     setSubmitting(false)
-    if (!loaded) {
-      setError('注册失败，请检查网络或稍后重试')
+    if (!user) {
+      setError(regError || '注册失败，请检查信息或稍后重试')
+      setForm((f) => ({ ...f, password: '', confirmPassword: '' }))
       return
     }
     const target = resolveRedirect(from)

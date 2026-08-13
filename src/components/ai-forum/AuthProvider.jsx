@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
-import { getCurrentUser, login as apiLogin, logout as apiLogout } from '../../utils/ai-forum/apiClient.js'
+import { getCurrentUser, login as apiLogin, register as apiRegister, logout as apiLogout } from '../../utils/ai-forum/apiClient.js'
 
 const AuthContext = createContext(null)
 
@@ -138,26 +138,48 @@ export function AuthProvider({ children }) {
 
   /**
    * 登录：调用后端 /auth/login 进行真实认证
-   * 成功后持久化用户到 localStorage，失败抛错供调用方处理
+   * 成功后持久化用户到 localStorage
    * @param {string} username 用户名（nickname 或 handle）
    * @param {string} password 密码
-   * @returns {Promise<Object|null>} 登录成功的用户对象，失败返回 null
+   * @returns {Promise<{user:Object|null, error:string|null}>} 成功返回 user，失败返回 error
    */
   const login = useCallback(async (username, password) => {
-    const data = await apiLogin(username, password)
-    if (data && data.user) {
-      setUser(data.user)
+    const res = await apiLogin(username, password)
+    if (res.ok && res.data && res.data.user) {
+      setUser(res.data.user)
       try {
-        localStorage.setItem(STORAGE_USER, JSON.stringify(data.user))
+        localStorage.setItem(STORAGE_USER, JSON.stringify(res.data.user))
       } catch {
         // 隐私模式静默失败：登录态仅保留在内存中
       }
       setGuestElapsed(0)
       setShowGuestBanner(false)
       setAuthModal({ open: false, reason: '' })
-      return data.user
+      return { user: res.data.user, error: null }
     }
-    return null
+    return { user: null, error: res.error || '登录失败，请检查用户名和密码' }
+  }, [])
+
+  /**
+   * 注册：调用后端 /auth/register 创建新用户，成功后自动登录
+   * @param {{nickname:string, email:string, password:string}} payload
+   * @returns {Promise<{user:Object|null, error:string|null}>}
+   */
+  const register = useCallback(async (payload) => {
+    const res = await apiRegister(payload)
+    if (res.ok && res.data && res.data.user) {
+      setUser(res.data.user)
+      try {
+        localStorage.setItem(STORAGE_USER, JSON.stringify(res.data.user))
+      } catch {
+        // 隐私模式静默失败：登录态仅保留在内存中
+      }
+      setGuestElapsed(0)
+      setShowGuestBanner(false)
+      setAuthModal({ open: false, reason: '' })
+      return { user: res.data.user, error: null }
+    }
+    return { user: null, error: res.error || '注册失败，请稍后重试' }
   }, [])
 
   /**
@@ -223,6 +245,7 @@ export function AuthProvider({ children }) {
     theme,
     toggleTheme,
     login,
+    register,
     logout,
     guestElapsed,
     guestStatus,
@@ -237,7 +260,7 @@ export function AuthProvider({ children }) {
     setLoginRedirect,
     setGuestElapsedRemaining,
   }), [
-    user, isAuthenticated, theme, toggleTheme, login, logout,
+    user, isAuthenticated, theme, toggleTheme, login, register, logout,
     guestElapsed, guestStatus, showGuestBanner, dismissGuestBanner,
     authModal, openAuthModal, closeAuthModal, requireAuth,
     loginRedirect, setGuestElapsedRemaining,
