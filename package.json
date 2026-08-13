@@ -10,7 +10,8 @@
     "proxy": "node server.js",
     "start": "node server.js",
     "db:init": "node scripts/init-db.mjs",
-    "db:seed": "node scripts/seed-db.mjs"
+    "db:seed": "node scripts/seed-db.mjs",
+    "db:migrate": "node scripts/migrate-auth.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",
@@ -18,7 +19,10 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
     "pg": "^8.23.0",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

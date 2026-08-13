@@ -7,6 +7,36 @@
 // 基础路径常量：相对路径，浏览器自动补充 origin，由 vite 代理转发
 const BASE_URL = '/api/forum'
 
+// Token 持久化 key：localStorage 存储 JWT
+const TOKEN_KEY = 'af_token'
+
+/** 获取 token（localStorage 读写均 try/catch 兜底隐私模式） */
+function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+/** 设置 token */
+function setToken(token) {
+  try {
+    localStorage.setItem(TOKEN_KEY, token)
+  } catch {
+    // 隐私模式静默失败
+  }
+}
+
+/** 清除 token */
+function removeToken() {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // 静默忽略
+  }
+}
+
 /**
  * 内部统一请求封装
  * - GET：params 拼接为 query string
@@ -34,16 +64,26 @@ async function request(method, path, params, body) {
       if (qsStr) url += `?${qsStr}`
     }
 
-    const options = {
-      method,
-      headers: { 'Content-Type': 'application/json' },
+    const headers = { 'Content-Type': 'application/json' }
+    // 自动注入 Authorization 头（若 token 存在）
+    const token = getToken()
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
     }
+
+    const options = { method, headers }
     // 仅 POST/PUT 携带请求体，避免 GET 请求误带 body 触发部分代理告警
     if (body !== undefined && body !== null && (method === 'POST' || method === 'PUT')) {
       options.body = JSON.stringify(body)
     }
 
     const res = await fetch(url, options)
+    // 401 统一处理：清除 token + 触发全局过期事件（AuthProvider 监听）
+    if (res.status === 401) {
+      removeToken()
+      window.dispatchEvent(new Event('auth:expired'))
+      return null
+    }
     if (!res.ok) {
       console.warn(`[apiClient] ${method} ${path} 失败: HTTP ${res.status}`)
       return null
@@ -158,13 +198,51 @@ export async function getUsers(params = {}) {
   return Array.isArray(data) ? data : []
 }
 
+// === 认证相关 ===
+
+/**
+ * 登录：POST /auth/login
+ * 成功后将 token 存入 localStorage，返回 user 对象
+ * @param {string} username 用户名（支持 nickname 或 handle）
+ * @param {string} password 密码
+ * @returns {Promise<{token: string, user: Object}|null>}
+ */
+export async function login(username, password) {
+  const data = await request('POST', '/auth/login', undefined, { username, password })
+  if (data && data.token) {
+    setToken(data.token)
+    return data
+  }
+  return null
+}
+
+/**
+ * 登出：POST /auth/logout
+ * 无论成功失败都清除本地 token
+ */
+export async function logout() {
+  await request('POST', '/auth/logout')
+  removeToken()
+}
+
+/**
+ * 获取当前登录用户：GET /auth/me
+ * 需携带有效 token（request 函数自动注入）
+ * @returns {Promise<Object|null>}
+ */
+export async function getMe() {
+  const data = await request('GET', '/auth/me')
+  if (data && data.user) return data.user
+  return null
+}
+
 /**
  * 获取当前登录用户
- * 约定：后端提供 GET /api/forum/users/u_alex 作为当前用户接口
- * @returns {Promise<Object|null>} 当前用户对象，失败返回 null
+ * 改为调用 /auth/me，基于 token 验证身份（不再硬编码 u_alex）
+ * @returns {Promise<Object|null>}
  */
 export async function getCurrentUser() {
-  return await request('GET', '/users/u_alex')
+  return await getMe()
 }
 
 /**
@@ -199,4 +277,7 @@ export default {
   getCurrentUser,
   getUserStats,
   getHealth,
+  login,
+  logout,
+  getMe,
 }

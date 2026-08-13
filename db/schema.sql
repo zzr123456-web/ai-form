@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
   city TEXT,
   joined_at DATE,
   status TEXT,
-  roles TEXT[]
+  roles TEXT[],
+  password_hash TEXT  -- 存储 bcrypt 哈希，不存明文
 );
 
 -- 2. 用户统计表（与 users 一对一）

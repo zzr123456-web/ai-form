@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
-import { getCurrentUser } from '../../utils/ai-forum/apiClient.js'
+import { getCurrentUser, login as apiLogin, logout as apiLogout } from '../../utils/ai-forum/apiClient.js'
 
 const AuthContext = createContext(null)
 
@@ -52,35 +52,57 @@ export function AuthProvider({ children }) {
     return 'active'
   }, [isAuthenticated, guestElapsed])
 
-  // 初始化异步加载当前用户：仅当 localStorage 存在持久化登录态时才请求后端，
-  // 这样既能恢复登录态，又能拿到数据库中的最新用户数据。
-  // cancelled 标志防止组件卸载后仍写入 state（满足 useEffect 必须清理的要求）
+  // 初始化：检查 token 有效性，恢复登录态
   useEffect(() => {
     let cancelled = false
-    // 读取持久化登录标记：存在则视为上次已登录，需从后端拉取最新用户数据
+    // 检查 localStorage 是否有持久化登录标记（用户对象）
     let hasPersisted = false
     try {
       hasPersisted = !!localStorage.getItem(STORAGE_USER)
     } catch {
       hasPersisted = false
     }
-    // 无持久化登录态：直接标记就绪，进入游客计时流程
     if (!hasPersisted) {
       setAuthReady(true)
       return () => { cancelled = true }
     }
+    // 有持久化标记：调 /auth/me 验证 token 有效性
     getCurrentUser()
       .then((loaded) => {
         if (cancelled) return
-        // 接口返回用户则恢复登录态；返回 null（如后端不可用）则保持未登录
-        if (loaded) setUser(loaded)
+        if (loaded) {
+          setUser(loaded)
+        } else {
+          // token 无效或过期：清除本地存储
+          try {
+            localStorage.removeItem(STORAGE_USER)
+          } catch {
+            // 静默忽略
+          }
+        }
       })
       .finally(() => {
         if (!cancelled) setAuthReady(true)
       })
     return () => { cancelled = true }
-    // 仅在挂载时执行一次：依赖为空数组
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 监听全局 auth:expired 事件：token 过期时清除登录态并弹出认证窗
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null)
+      setGuestElapsed(0)
+      setShowGuestBanner(false)
+      try {
+        localStorage.removeItem(STORAGE_USER)
+      } catch {
+        // 静默忽略
+      }
+      setAuthModal({ open: true, reason: '登录已过期，请重新登录' })
+    }
+    window.addEventListener('auth:expired', handleExpired)
+    return () => window.removeEventListener('auth:expired', handleExpired)
   }, [])
 
   // 未登录计时器：仅在初始认证检查完成且未登录时启动，每秒 +1
@@ -115,37 +137,41 @@ export function AuthProvider({ children }) {
   }, [theme])
 
   /**
-   * 登录：Phase0 不做真实认证，调用 getCurrentUser() 加载默认用户 u_alex 并标记已登录
-   * 改为异步并返回 Promise，便于调用方 await 后再执行跳转/错误提示
-   * 持久化逻辑从原 useEffect 迁移至此：避免 user 初始为 null 时误删 localStorage
-   * username/password 参数预留给 Phase1 真实认证，当前阶段暂不使用
+   * 登录：调用后端 /auth/login 进行真实认证
+   * 成功后持久化用户到 localStorage，失败抛错供调用方处理
+   * @param {string} username 用户名（nickname 或 handle）
+   * @param {string} password 密码
+   * @returns {Promise<Object|null>} 登录成功的用户对象，失败返回 null
    */
-  const login = useCallback(async (_username, _password) => {
-    const loaded = await getCurrentUser()
-    if (loaded) {
-      setUser(loaded)
+  const login = useCallback(async (username, password) => {
+    const data = await apiLogin(username, password)
+    if (data && data.user) {
+      setUser(data.user)
       try {
-        localStorage.setItem(STORAGE_USER, JSON.stringify(loaded))
+        localStorage.setItem(STORAGE_USER, JSON.stringify(data.user))
       } catch {
-        // 隐私模式或存储满时静默失败：登录态仅保留在内存中，刷新后丢失
+        // 隐私模式静默失败：登录态仅保留在内存中
       }
+      setGuestElapsed(0)
+      setShowGuestBanner(false)
+      setAuthModal({ open: false, reason: '' })
+      return data.user
     }
-    // 登录后立即清零计时、关闭横幅、关闭弹窗
-    setGuestElapsed(0)
-    setShowGuestBanner(false)
-    setAuthModal({ open: false, reason: '' })
-    return loaded
+    return null
   }, [])
 
-  /** 退出登录：清空用户、清除持久化登录态并重置游客计时（从零开始重新计 5 分钟） */
-  const logout = useCallback(() => {
+  /**
+   * 退出登录：调用后端 /auth/logout 销毁 session，清除本地 token 与用户状态
+   */
+  const logout = useCallback(async () => {
+    await apiLogout()
     setUser(null)
     setGuestElapsed(0)
     setShowGuestBanner(false)
     try {
       localStorage.removeItem(STORAGE_USER)
     } catch {
-      // 隐私模式下移除可能抛错，静默忽略
+      // 静默忽略
     }
   }, [])
 

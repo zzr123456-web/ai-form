@@ -3,15 +3,26 @@
  * 基于 Node.js 内置 http 模块，零第三方 Web 框架依赖
  * 监听端口 8787（可通过 process.env.PORT 覆盖）
  * 数据库连接池由 db/pool.js 提供
+ * 集成 Redis 缓存层（db/redis.js）与 JWT 认证（utils/auth.js）
  */
 import http from 'node:http'
 import dotenv from 'dotenv'
 import { query as dbQuery, pool as dbPool, healthCheck as dbHealthCheck } from './db/pool.js'
+import { cacheGet, cacheSet, cacheDel, cacheDelPattern, isRedisConnected, healthCheckRedis, closeRedis } from './db/redis.js'
+import {
+  boardListKey, topicListKey, userListKey, userKey, userStatsKey,
+  postListKey, postKey, commentsKey,
+  TTL_BOARDS, TTL_TOPICS, TTL_USERS, TTL_STATS, TTL_POSTS, TTL_POST_DETAIL, TTL_COMMENTS,
+} from './utils/cache.js'
+import { verifyPassword, signToken, createSession, destroySession } from './utils/auth.js'
+import { authenticate, requireAuth } from './utils/middleware.js'
 
 dotenv.config()
 
 // 数据库连接状态：启动后由 healthCheck 异步设置，未连接时不阻断服务，仅影响 /health 端点
 let dbConnected = false
+// Redis 连接状态：缓存与 session 依赖，断连时缓存层自动降级跳过（由 db/redis.js 内部处理）
+let redisConnected = false
 
 const PORT = process.env.PORT || 8787
 
@@ -193,24 +204,36 @@ async function fetchPostById(id) {
 async function handleHealth(req, res) {
   return sendJson(res, 200, {
     db: dbConnected ? 'connected' : 'disconnected',
+    redis: redisConnected ? 'connected' : 'disconnected',
     ts: Date.now(),
   })
 }
 
 async function handleListBoards(req, res) {
+  const cacheKey = boardListKey()
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
   const { rows } = await dbQuery(`SELECT * FROM boards ORDER BY post_count DESC`)
-  return sendJson(res, 200, rows.map(mapBoard))
+  const result = rows.map(mapBoard)
+  await cacheSet(cacheKey, result, TTL_BOARDS)
+  return sendJson(res, 200, result)
 }
 
 async function handleListTopics(req, res) {
+  const cacheKey = topicListKey()
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
   const { rows } = await dbQuery(`SELECT * FROM topics ORDER BY heat DESC`)
-  return sendJson(res, 200, rows.map(mapTopic))
+  const result = rows.map(mapTopic)
+  await cacheSet(cacheKey, result, TTL_TOPICS)
+  return sendJson(res, 200, result)
 }
 
 /**
  * 帖子列表：支持 sort / boardId / tag / page / limit
  * - sort=hot 与 quality 的 ORDER BY 表达式不接收外部输入，避免 SQL 注入
  * - tags 批量查询后在 JS 层分组，避免 N+1
+ * - 缓存 key 由查询参数组合生成，保证不同筛选互不污染
  */
 async function handleListPosts(req, res, url) {
   const sort = url.searchParams.get('sort') || 'latest'
@@ -219,6 +242,10 @@ async function handleListPosts(req, res, url) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
   const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10))
   const offset = (page - 1) * limit
+
+  const cacheKey = postListKey(sort, boardId, tag, page, limit)
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
 
   // 动态构建 WHERE 子句与参数数组
   const where = []
@@ -279,14 +306,19 @@ async function handleListPosts(req, res, url) {
   }
 
   const result = rows.map((r) => mapPostRow(r, tagsByPost.get(r.id) || []))
+  await cacheSet(cacheKey, result, TTL_POSTS)
   return sendJson(res, 200, result)
 }
 
 async function handleGetPost(req, res, id) {
+  const cacheKey = postKey(id)
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
   const post = await fetchPostById(id)
   if (!post) {
     return sendJson(res, 404, { error: '帖子不存在' })
   }
+  await cacheSet(cacheKey, post, TTL_POST_DETAIL)
   return sendJson(res, 200, post)
 }
 
@@ -324,6 +356,9 @@ async function handleCreatePost(req, res) {
   if (!post) {
     return sendJson(res, 500, { error: '帖子创建后回查失败' })
   }
+  // 发帖后清除列表缓存（排序变化）和版块缓存（post_count 变化），避免脏读
+  await cacheDelPattern('af:posts:list:*')
+  await cacheDel(boardListKey())
   return sendJson(res, 201, post)
 }
 
@@ -332,6 +367,9 @@ async function handleCreatePost(req, res) {
  * parent_id IS NULL 为顶层，其余按 parent_id 分组挂为 replies
  */
 async function handleListComments(req, res, postId) {
+  const cacheKey = commentsKey(postId)
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
   const { rows } = await dbQuery(
     `SELECT comments.*,
             users.id AS u_id, users.nickname AS u_nickname, users.avatar_text AS u_avatar_text
@@ -373,6 +411,7 @@ async function handleListComments(req, res, postId) {
   for (const top of topComments) {
     top.replies = repliesByParent.get(top.id) || []
   }
+  await cacheSet(cacheKey, topComments, TTL_COMMENTS)
   return sendJson(res, 200, topComments)
 }
 
@@ -383,6 +422,9 @@ async function handleListComments(req, res, postId) {
 async function handleListUsers(req, res, url) {
   const status = url.searchParams.get('status')
   const role = url.searchParams.get('role')
+  const cacheKey = userListKey(status, role)
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
   const where = []
   const params = []
   if (status) {
@@ -398,23 +440,100 @@ async function handleListUsers(req, res, url) {
     `SELECT * FROM users ${whereClause} ORDER BY joined_at DESC`,
     params
   )
-  return sendJson(res, 200, rows.map(mapUser))
+  const result = rows.map(mapUser)
+  await cacheSet(cacheKey, result, TTL_USERS)
+  return sendJson(res, 200, result)
 }
 
 async function handleGetUser(req, res, id) {
+  const cacheKey = userKey(id)
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
   const { rows } = await dbQuery(`SELECT * FROM users WHERE id = $1`, [id])
   if (rows.length === 0) {
     return sendJson(res, 404, { error: '用户不存在' })
   }
-  return sendJson(res, 200, mapUser(rows[0]))
+  const result = mapUser(rows[0])
+  await cacheSet(cacheKey, result, TTL_USERS)
+  return sendJson(res, 200, result)
 }
 
 async function handleGetUserStats(req, res, id) {
+  const cacheKey = userStatsKey(id)
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
   const { rows } = await dbQuery(`SELECT * FROM user_stats WHERE user_id = $1`, [id])
   if (rows.length === 0) {
     return sendJson(res, 404, { error: '用户统计不存在' })
   }
-  return sendJson(res, 200, mapUserStats(rows[0]))
+  const result = mapUserStats(rows[0])
+  await cacheSet(cacheKey, result, TTL_STATS)
+  return sendJson(res, 200, result)
+}
+
+// === 认证端点 ===
+
+/**
+ * 登录：验证用户名密码，签发 JWT + 创建 Redis session
+ * 用户名匹配：同时支持 nickname 和 handle
+ */
+async function handleLogin(req, res) {
+  const body = await readJsonBody(req)
+  const { username, password } = body
+  if (!username || !password) {
+    return sendJson(res, 400, { error: '请输入用户名和密码' })
+  }
+
+  // 按 nickname 或 handle 查询用户
+  const { rows } = await dbQuery(
+    `SELECT * FROM users WHERE nickname = $1 OR handle = $1`,
+    [username]
+  )
+  if (rows.length === 0) {
+    return sendJson(res, 401, { error: '用户名或密码错误' })
+  }
+
+  const user = rows[0]
+  // 验证密码
+  if (!verifyPassword(password, user.password_hash)) {
+    return sendJson(res, 401, { error: '用户名或密码错误' })
+  }
+
+  // 封禁用户禁止登录
+  if (user.status === 'banned') {
+    return sendJson(res, 403, { error: '账号已被封禁' })
+  }
+
+  // 签发 JWT + 创建 session（白名单模式，登出时可主动失效）
+  const { token, jti } = signToken({
+    userId: user.id,
+    nickname: user.nickname,
+    roles: user.roles || [],
+  })
+  await createSession(user.id, jti, token)
+
+  return sendJson(res, 200, { token, user: mapUser(user) })
+}
+
+/**
+ * 登出：删除 Redis session，使 token 失效
+ * requireAuth 包装，需携带有效 token
+ */
+async function handleLogout(req, res, authUser) {
+  await destroySession(authUser.userId, authUser.jti)
+  return sendJson(res, 200, { message: '已登出' })
+}
+
+/**
+ * 获取当前登录用户信息
+ * requireAuth 包装，从 DB 拉取最新用户数据（避免缓存中角色/状态过期）
+ */
+async function handleMe(req, res, authUser) {
+  const { rows } = await dbQuery(`SELECT * FROM users WHERE id = $1`, [authUser.userId])
+  if (rows.length === 0) {
+    return sendJson(res, 404, { error: '用户不存在' })
+  }
+  return sendJson(res, 200, { user: mapUser(rows[0]) })
 }
 
 // === 路由匹配器 ===
@@ -452,6 +571,17 @@ async function matchForumRoute(req, res, pathname, method, url) {
     }
     if (sub === '/users' && method === 'GET') {
       return await handleListUsers(req, res, url)
+    }
+
+    // === 认证路由 ===
+    if (sub === '/auth/login' && method === 'POST') {
+      return await handleLogin(req, res)
+    }
+    if (sub === '/auth/logout' && method === 'POST') {
+      return await requireAuth(handleLogout)(req, res)
+    }
+    if (sub === '/auth/me' && method === 'GET') {
+      return await requireAuth(handleMe)(req, res)
     }
 
     // === 动态路由：按 '/' 分段解析 ===
@@ -508,7 +638,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, async () => {
   console.log(`🚀 AI 论坛 API 服务已启动：http://localhost:${PORT}`)
-  // 启动后异步健康检查，失败仅告警不 crash
+  // 数据库健康检查
   try {
     const health = await dbHealthCheck()
     dbConnected = health.ok
@@ -517,9 +647,18 @@ server.listen(PORT, async () => {
     dbConnected = false
     console.error('⚠️ 数据库健康检查失败:', err.message)
   }
+  // Redis 健康检查，失败仅告警不阻断服务（缓存层自动降级）
+  try {
+    const redisHealth = await healthCheckRedis()
+    redisConnected = redisHealth.ok
+    console.log(`📦 Redis 连接：${redisHealth.ok ? '✅ ' + redisHealth.message : '⚠️ ' + redisHealth.message}`)
+  } catch (err) {
+    redisConnected = false
+    console.error('⚠️ Redis 健康检查失败:', err.message)
+  }
 })
 
-// 优雅关闭：SIGINT/SIGTERM 时先停 HTTP 再关闭连接池
+// 优雅关闭：SIGINT/SIGTERM 时先停 HTTP 再关闭连接池与 Redis
 function shutdown(signal) {
   console.log(`\n收到 ${signal} 信号，正在关闭服务...`)
   server.close(async () => {
@@ -528,6 +667,12 @@ function shutdown(signal) {
       console.log('📦 数据库连接池已关闭')
     } catch (err) {
       console.error('关闭连接池出错:', err.message)
+    }
+    try {
+      await closeRedis()
+      console.log('📦 Redis 连接已关闭')
+    } catch (err) {
+      console.error('关闭 Redis 出错:', err.message)
     }
     process.exit(0)
   })

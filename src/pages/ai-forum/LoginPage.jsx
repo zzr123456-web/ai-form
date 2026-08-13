@@ -101,10 +101,11 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setSubmitting(true)
+    // form.email 实际是用户名输入框（支持昵称或 handle）
     const loaded = await login(form.email, form.password)
     setSubmitting(false)
     if (!loaded) {
-      setError('登录失败，请检查网络或稍后重试')
+      setError('登录失败，请检查用户名和密码')
       return
     }
     const target = resolveRedirect(from)
@@ -227,6 +228,11 @@ export default function LoginPage() {
                 >
                   忘记密码？
                 </a>
+              </div>
+
+              {/* 测试账号提示 */}
+              <div className="text-xs text-afmuted-foreground bg-muted/30 rounded-af-md p-2 mt-2">
+                测试账号：AlexChen / 123456
               </div>
 
               <button
