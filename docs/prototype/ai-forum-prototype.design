@@ -1,0 +1,418 @@
+{
+  "data": [
+    {
+      "id": "page-index",
+      "title": "首页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786434826000,
+      "canvasData": {
+        "x": 620,
+        "y": 0,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1122,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-6660dfcc",
+          "measuredAt": 1786511225458
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/index.html",
+        "interactions": [
+          {
+            "id": "int-index-logo",
+            "type": "navigate",
+            "domId": "nav-logo",
+            "targetPageId": "page-index"
+          },
+          {
+            "id": "int-index-search",
+            "type": "navigate",
+            "domId": "nav-search",
+            "targetPageId": "page-search"
+          },
+          {
+            "id": "int-index-ask",
+            "type": "navigate",
+            "domId": "nav-ask",
+            "targetPageId": "page-qa"
+          },
+          {
+            "id": "int-index-create",
+            "type": "navigate",
+            "domId": "nav-create",
+            "targetPageId": "page-editor"
+          },
+          {
+            "id": "int-index-profile",
+            "type": "navigate",
+            "domId": "nav-profile",
+            "targetPageId": "page-profile"
+          },
+          {
+            "id": "int-index-feed-post",
+            "type": "navigate",
+            "domId": "feed-post-1",
+            "targetPageId": "page-post"
+          },
+          {
+            "id": "int-index-board",
+            "type": "navigate",
+            "domId": "sidebar-board-1",
+            "targetPageId": "page-boards"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-boards",
+      "title": "版块列表页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786434826000,
+      "canvasData": {
+        "x": 0,
+        "y": 377,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1665,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-b8d8aa18",
+          "measuredAt": 1786511225458
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/boards.html",
+        "interactions": [
+          {
+            "id": "int-boards-logo",
+            "type": "navigate",
+            "domId": "nav-logo",
+            "targetPageId": "page-index"
+          },
+          {
+            "id": "int-boards-search",
+            "type": "navigate",
+            "domId": "nav-search",
+            "targetPageId": "page-search"
+          },
+          {
+            "id": "int-boards-create",
+            "type": "navigate",
+            "domId": "nav-create",
+            "targetPageId": "page-editor"
+          },
+          {
+            "id": "int-boards-profile",
+            "type": "navigate",
+            "domId": "nav-profile",
+            "targetPageId": "page-profile"
+          },
+          {
+            "id": "int-boards-post",
+            "type": "navigate",
+            "domId": "post-item-1",
+            "targetPageId": "page-post"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-post",
+      "title": "帖子详情页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786434826000,
+      "canvasData": {
+        "x": 620,
+        "y": 1508,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 2034,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-97a67c38",
+          "measuredAt": 1786511225458
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/post.html",
+        "interactions": [
+          {
+            "id": "int-post-logo",
+            "type": "navigate",
+            "domId": "nav-logo",
+            "targetPageId": "page-index"
+          },
+          {
+            "id": "int-post-search",
+            "type": "navigate",
+            "domId": "nav-search",
+            "targetPageId": "page-search"
+          },
+          {
+            "id": "int-post-create",
+            "type": "navigate",
+            "domId": "nav-create",
+            "targetPageId": "page-editor"
+          },
+          {
+            "id": "int-post-profile",
+            "type": "navigate",
+            "domId": "nav-profile",
+            "targetPageId": "page-profile"
+          },
+          {
+            "id": "int-post-author",
+            "type": "navigate",
+            "domId": "author-avatar",
+            "targetPageId": "page-profile"
+          },
+          {
+            "id": "int-post-related",
+            "type": "navigate",
+            "domId": "related-post-1",
+            "targetPageId": "page-post"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-editor",
+      "title": "发帖编辑页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786434826000,
+      "canvasData": {
+        "x": 620,
+        "y": 754,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 941,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-b278e8fc",
+          "measuredAt": 1786511225458
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/editor.html",
+        "interactions": [
+          {
+            "id": "int-editor-logo",
+            "type": "navigate",
+            "domId": "nav-logo",
+            "targetPageId": "page-index"
+          },
+          {
+            "id": "int-editor-profile",
+            "type": "navigate",
+            "domId": "nav-profile",
+            "targetPageId": "page-profile"
+          },
+          {
+            "id": "int-editor-publish",
+            "type": "navigate",
+            "domId": "btn-publish",
+            "targetPageId": "page-post"
+          },
+          {
+            "id": "int-editor-search",
+            "type": "navigate",
+            "domId": "nav-search",
+            "targetPageId": "page-search"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-qa",
+      "title": "AI 答疑页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786434826000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 2184,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-cb92916a",
+          "measuredAt": 1786511225458
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/qa.html",
+        "interactions": [
+          {
+            "id": "int-qa-logo",
+            "type": "navigate",
+            "domId": "nav-logo",
+            "targetPageId": "page-index"
+          },
+          {
+            "id": "int-qa-search",
+            "type": "navigate",
+            "domId": "nav-search",
+            "targetPageId": "page-search"
+          },
+          {
+            "id": "int-qa-create",
+            "type": "navigate",
+            "domId": "nav-create",
+            "targetPageId": "page-editor"
+          },
+          {
+            "id": "int-qa-profile",
+            "type": "navigate",
+            "domId": "nav-profile",
+            "targetPageId": "page-profile"
+          },
+          {
+            "id": "int-qa-source",
+            "type": "navigate",
+            "domId": "source-card-1",
+            "targetPageId": "page-post"
+          },
+          {
+            "id": "int-qa-related",
+            "type": "navigate",
+            "domId": "related-question-2",
+            "targetPageId": "page-post"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-search",
+      "title": "搜索结果页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786434826000,
+      "canvasData": {
+        "x": 620,
+        "y": 377,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1693,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-f2842a2d",
+          "measuredAt": 1786511225458
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/search.html",
+        "interactions": [
+          {
+            "id": "int-search-logo",
+            "type": "navigate",
+            "domId": "nav-logo",
+            "targetPageId": "page-index"
+          },
+          {
+            "id": "int-search-ask",
+            "type": "navigate",
+            "domId": "nav-ask",
+            "targetPageId": "page-qa"
+          },
+          {
+            "id": "int-search-create",
+            "type": "navigate",
+            "domId": "nav-create",
+            "targetPageId": "page-editor"
+          },
+          {
+            "id": "int-search-profile",
+            "type": "navigate",
+            "domId": "nav-profile",
+            "targetPageId": "page-profile"
+          },
+          {
+            "id": "int-search-result-post",
+            "type": "navigate",
+            "domId": "search-result-post-1",
+            "targetPageId": "page-post"
+          },
+          {
+            "id": "int-search-result-user",
+            "type": "navigate",
+            "domId": "search-result-user-1",
+            "targetPageId": "page-profile"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-profile",
+      "title": "个人主页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786434826000,
+      "canvasData": {
+        "x": 620,
+        "y": 1131,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1104,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-be425081",
+          "measuredAt": 1786511225458
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/profile.html",
+        "interactions": [
+          {
+            "id": "int-profile-logo",
+            "type": "navigate",
+            "domId": "nav-logo",
+            "targetPageId": "page-index"
+          },
+          {
+            "id": "int-profile-search",
+            "type": "navigate",
+            "domId": "nav-search",
+            "targetPageId": "page-search"
+          },
+          {
+            "id": "int-profile-ask",
+            "type": "navigate",
+            "domId": "nav-ask",
+            "targetPageId": "page-qa"
+          },
+          {
+            "id": "int-profile-create",
+            "type": "navigate",
+            "domId": "nav-create",
+            "targetPageId": "page-editor"
+          },
+          {
+            "id": "int-profile-post",
+            "type": "navigate",
+            "domId": "profile-post-1",
+            "targetPageId": "page-post"
+          },
+          {
+            "id": "int-profile-following",
+            "type": "navigate",
+            "domId": "following-user-1",
+            "targetPageId": "page-profile"
+          }
+        ]
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "projectName": "AI 辅助论坛原型",
+    "designLibrary": null
+  }
+}

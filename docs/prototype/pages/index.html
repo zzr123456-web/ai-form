@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首页</title>
+    <style id="theme-vars">
+/* AI 辅助论坛原型 —— 现代极简设计系统 */
+
+:root {
+  /* === 品牌主色：深蓝灰，克制而有力 === */
+  --af-brand-50: #f8fafc;
+  --af-brand-100: #f1f5f9;
+  --af-brand-200: #e2e8f0;
+  --af-brand-300: #cbd5e1;
+  --af-brand-400: #94a3b8;
+  --af-brand-500: #64748b;
+  --af-brand-600: #475569;
+  --af-brand-700: #334155;
+  --af-brand-800: #1e293b;
+  --af-brand-900: #0f172a;
+
+  /* === 中性灰阶 === */
+  --af-gray-0: #ffffff;
+  --af-gray-50: #fafafa;
+  --af-gray-100: #f5f5f5;
+  --af-gray-200: #e5e5e5;
+  --af-gray-300: #d4d4d4;
+  --af-gray-400: #a3a3a3;
+  --af-gray-500: #737373;
+  --af-gray-600: #525252;
+  --af-gray-700: #404040;
+  --af-gray-800: #262626;
+  --af-gray-900: #171717;
+  --af-gray-950: #0a0a0a;
+
+  /* === 语义 Token（Light Mode） === */
+  --af-background: var(--af-gray-50);
+  --af-foreground: var(--af-gray-950);
+  --af-card: var(--af-gray-0);
+  --af-card-foreground: var(--af-gray-950);
+  --af-popover: var(--af-gray-0);
+  --af-popover-foreground: var(--af-gray-950);
+  --af-primary: var(--af-gray-950);
+  --af-primary-foreground: var(--af-gray-0);
+  --af-secondary: var(--af-gray-100);
+  --af-secondary-foreground: var(--af-gray-900);
+  --af-muted: var(--af-gray-100);
+  --af-muted-foreground: var(--af-gray-500);
+  --af-border: var(--af-gray-200);
+  --af-input: var(--af-gray-200);
+  --af-ring: var(--af-gray-950);
+  --af-radius-small: 4px;
+  --af-radius-medium: 8px;
+  --af-radius-large: 12px;
+  --af-radius-xlarge: 16px;
+
+  /* === 状态色（仅用于状态/验证/操作反馈） === */
+  --af-state-success: #16a34a;
+  --af-state-success-bg: #f0fdf4;
+  --af-state-warning: #ca8a04;
+  --af-state-warning-bg: #fefce8;
+  --af-state-error: #dc2626;
+  --af-state-error-bg: #fef2f2;
+  --af-state-info: #2563eb;
+  --af-state-info-bg: #eff6ff;
+
+  /* === 表面与阴影 === */
+  --af-surface: var(--af-gray-0);
+  --af-surface-2: var(--af-gray-100);
+  --af-ink: var(--af-gray-950);
+  --af-ink-2: var(--af-gray-600);
+  --af-ink-3: var(--af-gray-400);
+  --af-line: var(--af-gray-200);
+  --af-brand: var(--af-gray-950);
+  --af-brand-ink: var(--af-gray-0);
+
+  --af-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --af-shadow-2: 0 8px 24px -8px rgba(15, 23, 42, 0.14);
+  --af-shadow-3: 0 24px 60px -20px rgba(15, 23, 42, 0.24);
+
+  /* === 字体系统 === */
+  --af-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --af-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* === 间距系统（8pt 网格） === */
+  --af-space-1: 4px;
+  --af-space-2: 8px;
+  --af-space-3: 12px;
+  --af-space-4: 16px;
+  --af-space-5: 24px;
+  --af-space-6: 32px;
+  --af-space-7: 48px;
+  --af-space-8: 64px;
+  --af-space-9: 96px;
+}
+
+/* === Dark Mode（通过父级 class 切换） === */
+.dark {
+  --af-background: var(--af-gray-950);
+  --af-foreground: var(--af-gray-50);
+  --af-card: var(--af-gray-900);
+  --af-card-foreground: var(--af-gray-50);
+  --af-popover: var(--af-gray-900);
+  --af-popover-foreground: var(--af-gray-50);
+  --af-primary: var(--af-gray-0);
+  --af-primary-foreground: var(--af-gray-950);
+  --af-secondary: var(--af-gray-800);
+  --af-secondary-foreground: var(--af-gray-100);
+  --af-muted: var(--af-gray-800);
+  --af-muted-foreground: var(--af-gray-400);
+  --af-border: var(--af-gray-800);
+  --af-input: var(--af-gray-800);
+  --af-ring: var(--af-gray-100);
+
+  --af-surface: var(--af-gray-900);
+  --af-surface-2: var(--af-gray-800);
+  --af-ink: var(--af-gray-50);
+  --af-ink-2: var(--af-gray-400);
+  --af-ink-3: var(--af-gray-600);
+  --af-line: var(--af-gray-800);
+  --af-brand: var(--af-gray-0);
+  --af-brand-ink: var(--af-gray-950);
+
+  --af-state-success: #22c55e;
+  --af-state-success-bg: rgba(34, 197, 94, 0.12);
+  --af-state-warning: #eab308;
+  --af-state-warning-bg: rgba(234, 179, 8, 0.12);
+  --af-state-error: #ef4444;
+  --af-state-error-bg: rgba(239, 68, 68, 0.12);
+  --af-state-info: #3b82f6;
+  --af-state-info-bg: rgba(59, 130, 246, 0.12);
+
+  --af-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.16);
+  --af-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  --af-shadow-3: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* === 基础排版工具类 === */
+.font-sans { font-family: var(--af-font-sans); }
+.font-mono { font-family: var(--af-font-mono); }
+
+/* === 滚动条极简样式 === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--af-gray-300); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: var(--af-gray-700); }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--af-background);
+    --color-foreground: var(--af-foreground);
+    --color-card: var(--af-card);
+    --color-card-foreground: var(--af-card-foreground);
+    --color-popover: var(--af-popover);
+    --color-popover-foreground: var(--af-popover-foreground);
+    --color-primary: var(--af-primary);
+    --color-primary-foreground: var(--af-primary-foreground);
+    --color-secondary: var(--af-secondary);
+    --color-secondary-foreground: var(--af-secondary-foreground);
+    --color-muted: var(--af-muted);
+    --color-muted-foreground: var(--af-muted-foreground);
+    --color-border: var(--af-border);
+    --color-input: var(--af-input);
+    --color-ring: var(--af-ring);
+    --radius-sm: var(--af-radius-small);
+    --radius-md: var(--af-radius-medium);
+    --radius-lg: var(--af-radius-large);
+    --radius-xl: var(--af-radius-xlarge);
+  }
+  @layer base {
+    body { background: var(--af-background); color: var(--af-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--af-background); }
+      .text-background { color: var(--af-background); }
+      .border-background { border-color: var(--af-background); }
+      .ring-background { --tw-ring-color: var(--af-background); }
+      .bg-foreground { background-color: var(--af-foreground); }
+      .text-foreground { color: var(--af-foreground); }
+      .border-foreground { border-color: var(--af-foreground); }
+      .ring-foreground { --tw-ring-color: var(--af-foreground); }
+      .bg-card { background-color: var(--af-card); }
+      .text-card { color: var(--af-card); }
+      .border-card { border-color: var(--af-card); }
+      .ring-card { --tw-ring-color: var(--af-card); }
+      .bg-card-foreground { background-color: var(--af-card-foreground); }
+      .text-card-foreground { color: var(--af-card-foreground); }
+      .border-card-foreground { border-color: var(--af-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--af-card-foreground); }
+      .bg-popover { background-color: var(--af-popover); }
+      .text-popover { color: var(--af-popover); }
+      .border-popover { border-color: var(--af-popover); }
+      .ring-popover { --tw-ring-color: var(--af-popover); }
+      .bg-popover-foreground { background-color: var(--af-popover-foreground); }
+      .text-popover-foreground { color: var(--af-popover-foreground); }
+      .border-popover-foreground { border-color: var(--af-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--af-popover-foreground); }
+      .bg-primary { background-color: var(--af-primary); }
+      .text-primary { color: var(--af-primary); }
+      .border-primary { border-color: var(--af-primary); }
+      .ring-primary { --tw-ring-color: var(--af-primary); }
+      .bg-primary-foreground { background-color: var(--af-primary-foreground); }
+      .text-primary-foreground { color: var(--af-primary-foreground); }
+      .border-primary-foreground { border-color: var(--af-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--af-primary-foreground); }
+      .bg-secondary { background-color: var(--af-secondary); }
+      .text-secondary { color: var(--af-secondary); }
+      .border-secondary { border-color: var(--af-secondary); }
+      .ring-secondary { --tw-ring-color: var(--af-secondary); }
+      .bg-secondary-foreground { background-color: var(--af-secondary-foreground); }
+      .text-secondary-foreground { color: var(--af-secondary-foreground); }
+      .border-secondary-foreground { border-color: var(--af-secondary-foreground); }
+      .ring-secondary-foreground { --tw-ring-color: var(--af-secondary-foreground); }
+      .bg-muted { background-color: var(--af-muted); }
+      .text-muted { color: var(--af-muted); }
+      .border-muted { border-color: var(--af-muted); }
+      .ring-muted { --tw-ring-color: var(--af-muted); }
+      .bg-muted-foreground { background-color: var(--af-muted-foreground); }
+      .text-muted-foreground { color: var(--af-muted-foreground); }
+      .border-muted-foreground { border-color: var(--af-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--af-muted-foreground); }
+      .bg-border { background-color: var(--af-border); }
+      .text-border { color: var(--af-border); }
+      .border-border { border-color: var(--af-border); }
+      .ring-border { --tw-ring-color: var(--af-border); }
+      .bg-input { background-color: var(--af-input); }
+      .text-input { color: var(--af-input); }
+      .border-input { border-color: var(--af-input); }
+      .ring-input { --tw-ring-color: var(--af-input); }
+      .bg-ring { background-color: var(--af-ring); }
+      .text-ring { color: var(--af-ring); }
+      .border-ring { border-color: var(--af-ring); }
+      .ring-ring { --tw-ring-color: var(--af-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="flex-1">
+        <!-- 顶部导航栏 -->
+        <header class="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur border-b border-border">
+            <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+                <a href="./index.html" data-dom-id="nav-logo" class="flex items-center gap-2 shrink-0">
+                    <div class="w-8 h-8 bg-primary text-primary-foreground rounded-md flex items-center justify-center font-bold text-sm">AF</div>
+                    <span class="font-semibold text-foreground hidden sm:block">AI Forum</span>
+                </a>
+
+                <div class="flex-1 max-w-md hidden sm:block">
+                    <a href="./search.html" data-dom-id="nav-search" class="flex items-center gap-2 w-full h-9 px-3 rounded-md bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                        <i data-lucide="search" class="size-4"></i>
+                        <span class="text-sm">搜索问题、话题或用户</span>
+                    </a>
+                </div>
+
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <a href="./search.html" class="sm:hidden p-2 text-muted-foreground hover:text-foreground" aria-label="搜索">
+                        <i data-lucide="search" class="size-5"></i>
+                    </a>
+                    <a href="./qa.html" data-dom-id="nav-ask" class="hidden sm:inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
+                        <i data-lucide="help-circle" class="size-4"></i>
+                        提问
+                    </a>
+                    <a href="./editor.html" data-dom-id="nav-create" class="inline-flex items-center gap-1.5 h-9 px-3 sm:px-4 rounded-md border border-border bg-card text-foreground text-sm font-medium hover:bg-secondary transition-colors">
+                        <i data-lucide="plus" class="size-4"></i>
+                        <span class="hidden sm:inline">发帖</span>
+                    </a>
+                    <button type="button" class="relative p-2 text-muted-foreground hover:text-foreground transition-colors" aria-label="通知">
+                        <i data-lucide="bell" class="size-5"></i>
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full"></span>
+                    </button>
+                    <a href="./profile.html" data-dom-id="nav-profile" class="w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center text-xs font-medium hover:ring-2 hover:ring-ring transition-all" aria-label="个人主页">
+                        <i data-lucide="user" class="size-4"></i>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <div class="pt-20 pb-8 px-4">
+            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- 左侧推荐内容流 -->
+                <section class="lg:col-span-8 space-y-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h1 class="text-xl font-semibold text-foreground">推荐内容</h1>
+                        <div class="flex items-center gap-1 text-sm text-muted-foreground">
+                            <button type="button" class="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground font-medium">最新</button>
+                            <button type="button" class="px-3 py-1.5 rounded-md hover:bg-secondary text-muted-foreground transition-colors">热门</button>
+                            <button type="button" class="px-3 py-1.5 rounded-md hover:bg-secondary text-muted-foreground transition-colors">关注</button>
+                        </div>
+                    </div>
+
+                    <!-- 帖子卡片 1 -->
+                    <article class="bg-card border border-border rounded-lg p-5 hover:border-muted-foreground/30 transition-colors cursor-pointer">
+                        <a href="./post.html" data-dom-id="feed-post-1" class="block">
+                            <h2 class="text-lg font-semibold text-foreground mb-2">如何用提示词工程让大模型输出更稳定的 JSON 格式？</h2>
+                            <p class="text-sm text-muted-foreground line-clamp-2 mb-4">最近在对接 LLM API 时，发现模型返回的 JSON 偶尔会出现字段缺失或格式错误的情况。我尝试了 few-shot 和 schema 约束，但效果不够稳定。有没有更可靠的策略？</p>
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium shrink-0">陈</div>
+                                    <span class="text-xs text-foreground truncate">陈明哲</span>
+                                    <span class="text-xs text-muted-foreground">·</span>
+                                    <span class="text-xs text-muted-foreground truncate">AI 开发实践</span>
+                                    <div class="hidden sm:flex items-center gap-1.5">
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">Prompt Engineering</span>
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">JSON</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                                    <span class="flex items-center gap-1"><i data-lucide="heart" class="size-4"></i> 128</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="message-square" class="size-4"></i> 34</span>
+                                    <span class="hidden sm:inline">2 小时前</span>
+                                </div>
+                            </div>
+                        </a>
+                    </article>
+
+                    <!-- 帖子卡片 2 -->
+                    <article class="bg-card border border-border rounded-lg p-5 hover:border-muted-foreground/30 transition-colors cursor-pointer">
+                        <a href="./post.html" data-dom-id="feed-post-2" class="block">
+                            <h2 class="text-lg font-semibold text-foreground mb-2">AI 辅助编程半年复盘：哪些场景真正提升了效率？</h2>
+                            <p class="text-sm text-muted-foreground line-clamp-2 mb-4">从代码补全到代码审查，再到自动化测试生成，过去半年我逐步把 AI 工具融入日常开发。这篇文章总结了真正带来效率提升的三个场景，以及容易踩坑的地方。</p>
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium shrink-0">林</div>
+                                    <span class="text-xs text-foreground truncate">林晓彤</span>
+                                    <span class="text-xs text-muted-foreground">·</span>
+                                    <span class="text-xs text-muted-foreground truncate">经验分享</span>
+                                    <div class="hidden sm:flex items-center gap-1.5">
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">效率工具</span>
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">Copilot</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                                    <span class="flex items-center gap-1"><i data-lucide="heart" class="size-4"></i> 256</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="message-square" class="size-4"></i> 67</span>
+                                    <span class="hidden sm:inline">5 小时前</span>
+                                </div>
+                            </div>
+                        </a>
+                    </article>
+
+                    <!-- 帖子卡片 3 -->
+                    <article class="bg-card border border-border rounded-lg p-5 hover:border-muted-foreground/30 transition-colors cursor-pointer">
+                        <a href="./post.html" data-dom-id="feed-post-3" class="block">
+                            <h2 class="text-lg font-semibold text-foreground mb-2">本地部署 7B 模型做知识库问答的硬件与选型建议</h2>
+                            <p class="text-sm text-muted-foreground line-clamp-2 mb-4">想在团队内部署一个本地化的知识库问答系统，预算有限。对比了 Llama 3、Qwen 2 和 Mistral 等开源模型，整理了一份面向中小企业的选型与硬件配置清单。</p>
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium shrink-0">王</div>
+                                    <span class="text-xs text-foreground truncate">王浩然</span>
+                                    <span class="text-xs text-muted-foreground">·</span>
+                                    <span class="text-xs text-muted-foreground truncate">模型部署</span>
+                                    <div class="hidden sm:flex items-center gap-1.5">
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">RAG</span>
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">本地部署</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                                    <span class="flex items-center gap-1"><i data-lucide="heart" class="size-4"></i> 89</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="message-square" class="size-4"></i> 21</span>
+                                    <span class="hidden sm:inline">1 天前</span>
+                                </div>
+                            </div>
+                        </a>
+                    </article>
+
+                    <!-- 帖子卡片 4 -->
+                    <article class="bg-card border border-border rounded-lg p-5 hover:border-muted-foreground/30 transition-colors cursor-pointer">
+                        <a href="./post.html" class="block">
+                            <h2 class="text-lg font-semibold text-foreground mb-2">讨论：AI 生成内容在学术写作中的边界在哪里？</h2>
+                            <p class="text-sm text-muted-foreground line-clamp-2 mb-4">随着越来越多期刊和高校出台 AI 使用政策，学术界对生成式 AI 的态度日趋谨慎。大家如何看待 AI 在文献综述、语言润色和观点生成中的合理使用边界？</p>
+                            <div class="flex items-center justify-between gap-4">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium shrink-0">张</div>
+                                    <span class="text-xs text-foreground truncate">张悦</span>
+                                    <span class="text-xs text-muted-foreground">·</span>
+                                    <span class="text-xs text-muted-foreground truncate">思辨与讨论</span>
+                                    <div class="hidden sm:flex items-center gap-1.5">
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">学术伦理</span>
+                                        <span class="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-xs">AIGC</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                                    <span class="flex items-center gap-1"><i data-lucide="heart" class="size-4"></i> 312</span>
+                                    <span class="flex items-center gap-1"><i data-lucide="message-square" class="size-4"></i> 108</span>
+                                    <span class="hidden sm:inline">2 天前</span>
+                                </div>
+                            </div>
+                        </a>
+                    </article>
+                </section>
+
+                <!-- 右侧边栏 -->
+                <aside class="lg:col-span-4 space-y-4">
+                    <!-- AI 推荐位 -->
+                    <div class="bg-card border border-border rounded-lg p-5">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="sparkles" class="size-5 text-foreground"></i>
+                            <h2 class="font-semibold text-foreground">AI 推荐</h2>
+                        </div>
+                        <ul class="space-y-3">
+                            <li>
+                                <a href="./post.html" class="group block">
+                                    <p class="text-sm text-foreground group-hover:text-muted-foreground transition-colors">基于你的浏览，推荐关注「RAG 检索增强生成」话题</p>
+                                    <span class="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                                        查看相关讨论 <i data-lucide="arrow-up-right" class="size-3"></i>
+                                    </span>
+                                </a>
+                            </li>
+                            <li class="border-t border-border pt-3">
+                                <a href="./post.html" class="group block">
+                                    <p class="text-sm text-foreground group-hover:text-muted-foreground transition-colors">你可能对这篇《提示词模板合集》感兴趣</p>
+                                    <span class="inline-flex items-center gap-1 mt-1.5 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                                        阅读文章 <i data-lucide="arrow-up-right" class="size-3"></i>
+                                    </span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 热门话题 -->
+                    <div class="bg-card border border-border rounded-lg p-5">
+                        <h2 class="font-semibold text-foreground mb-4">热门话题</h2>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="./search.html" data-dom-id="sidebar-topic-1" class="px-3 py-1.5 rounded-full border border-border bg-card text-sm text-foreground hover:bg-secondary hover:border-secondary transition-colors">#大模型应用</a>
+                            <a href="./search.html" data-dom-id="sidebar-topic-2" class="px-3 py-1.5 rounded-full border border-border bg-card text-sm text-foreground hover:bg-secondary hover:border-secondary transition-colors">#Agent 开发</a>
+                            <a href="./search.html" class="px-3 py-1.5 rounded-full border border-border bg-card text-sm text-foreground hover:bg-secondary hover:border-secondary transition-colors">#RAG</a>
+                            <a href="./search.html" class="px-3 py-1.5 rounded-full border border-border bg-card text-sm text-foreground hover:bg-secondary hover:border-secondary transition-colors">#AI 编程</a>
+                            <a href="./search.html" class="px-3 py-1.5 rounded-full border border-border bg-card text-sm text-foreground hover:bg-secondary hover:border-secondary transition-colors">#多模态</a>
+                            <a href="./search.html" class="px-3 py-1.5 rounded-full border border-border bg-card text-sm text-foreground hover:bg-secondary hover:border-secondary transition-colors">#AI 伦理</a>
+                        </div>
+                    </div>
+
+                    <!-- 版块快捷入口 -->
+                    <div class="bg-card border border-border rounded-lg p-5">
+                        <h2 class="font-semibold text-foreground mb-4">版块快捷入口</h2>
+                        <ul class="space-y-1">
+                            <li>
+                                <a href="./boards.html" data-dom-id="sidebar-board-1" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-secondary transition-colors">
+                                    <span class="text-sm text-foreground">AI 开发实践</span>
+                                    <span class="text-xs text-muted-foreground">1.2k 帖子</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="./boards.html" data-dom-id="sidebar-board-2" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-secondary transition-colors">
+                                    <span class="text-sm text-foreground">模型部署与优化</span>
+                                    <span class="text-xs text-muted-foreground">856 帖子</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="./boards.html" data-dom-id="sidebar-board-3" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-secondary transition-colors">
+                                    <span class="text-sm text-foreground">经验分享</span>
+                                    <span class="text-xs text-muted-foreground">643 帖子</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="./boards.html" class="flex items-center justify-between px-3 py-2 rounded-md hover:bg-secondary transition-colors">
+                                    <span class="text-sm text-foreground">思辨与讨论</span>
+                                    <span class="text-xs text-muted-foreground">521 帖子</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <!-- 未登录浏览提示 -->
+        <div class="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border shadow-[var(--af-shadow-2)]">
+            <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+                <p class="text-sm text-foreground">
+                    你已浏览 4 分 30 秒，<a href="./profile.html" class="underline underline-offset-4 hover:text-muted-foreground transition-colors">登录后获得完整体验</a>
+                </p>
+                <div class="flex items-center gap-2 shrink-0">
+                    <a href="./profile.html" class="h-8 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">登录</a>
+                    <button type="button" class="p-1.5 text-muted-foreground hover:text-foreground transition-colors" aria-label="关闭提示">
+                        <i data-lucide="x" class="size-4"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer class="border-t border-border bg-background pb-20 lg:pb-8">
+            <div class="max-w-6xl mx-auto px-4 py-8">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div>
+                        <h3 class="text-sm font-semibold text-foreground mb-3">关于</h3>
+                        <ul class="space-y-2">
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">关于我们</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">加入社区</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">联系我们</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-foreground mb-3">规则</h3>
+                        <ul class="space-y-2">
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">社区规范</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">内容政策</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">版主制度</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-foreground mb-3">法律</h3>
+                        <ul class="space-y-2">
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">隐私政策</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">用户协议</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Cookie 政策</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-foreground mb-3">帮助</h3>
+                        <ul class="space-y-2">
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">使用帮助</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">反馈建议</a></li>
+                            <li><a href="#" class="text-sm text-muted-foreground hover:text-foreground transition-colors">安全中心</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-8 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p class="text-xs text-muted-foreground">© 2026 AI Forum. 保留所有权利。</p>
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="text-xs text-muted-foreground hover:text-foreground transition-colors">简体中文</a>
+                        <a href="#" class="text-xs text-muted-foreground hover:text-foreground transition-colors">English</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

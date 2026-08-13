@@ -1,0 +1,140 @@
+/* AI 辅助论坛原型 —— 现代极简设计系统 */
+
+:root {
+  /* === 品牌主色：深蓝灰，克制而有力 === */
+  --af-brand-50: #f8fafc;
+  --af-brand-100: #f1f5f9;
+  --af-brand-200: #e2e8f0;
+  --af-brand-300: #cbd5e1;
+  --af-brand-400: #94a3b8;
+  --af-brand-500: #64748b;
+  --af-brand-600: #475569;
+  --af-brand-700: #334155;
+  --af-brand-800: #1e293b;
+  --af-brand-900: #0f172a;
+
+  /* === 中性灰阶 === */
+  --af-gray-0: #ffffff;
+  --af-gray-50: #fafafa;
+  --af-gray-100: #f5f5f5;
+  --af-gray-200: #e5e5e5;
+  --af-gray-300: #d4d4d4;
+  --af-gray-400: #a3a3a3;
+  --af-gray-500: #737373;
+  --af-gray-600: #525252;
+  --af-gray-700: #404040;
+  --af-gray-800: #262626;
+  --af-gray-900: #171717;
+  --af-gray-950: #0a0a0a;
+
+  /* === 语义 Token（Light Mode） === */
+  --af-background: var(--af-gray-50);
+  --af-foreground: var(--af-gray-950);
+  --af-card: var(--af-gray-0);
+  --af-card-foreground: var(--af-gray-950);
+  --af-popover: var(--af-gray-0);
+  --af-popover-foreground: var(--af-gray-950);
+  --af-primary: var(--af-gray-950);
+  --af-primary-foreground: var(--af-gray-0);
+  --af-secondary: var(--af-gray-100);
+  --af-secondary-foreground: var(--af-gray-900);
+  --af-muted: var(--af-gray-100);
+  --af-muted-foreground: var(--af-gray-500);
+  --af-border: var(--af-gray-200);
+  --af-input: var(--af-gray-200);
+  --af-ring: var(--af-gray-950);
+  --af-radius-small: 4px;
+  --af-radius-medium: 8px;
+  --af-radius-large: 12px;
+  --af-radius-xlarge: 16px;
+
+  /* === 状态色（仅用于状态/验证/操作反馈） === */
+  --af-state-success: #16a34a;
+  --af-state-success-bg: #f0fdf4;
+  --af-state-warning: #ca8a04;
+  --af-state-warning-bg: #fefce8;
+  --af-state-error: #dc2626;
+  --af-state-error-bg: #fef2f2;
+  --af-state-info: #2563eb;
+  --af-state-info-bg: #eff6ff;
+
+  /* === 表面与阴影 === */
+  --af-surface: var(--af-gray-0);
+  --af-surface-2: var(--af-gray-100);
+  --af-ink: var(--af-gray-950);
+  --af-ink-2: var(--af-gray-600);
+  --af-ink-3: var(--af-gray-400);
+  --af-line: var(--af-gray-200);
+  --af-brand: var(--af-gray-950);
+  --af-brand-ink: var(--af-gray-0);
+
+  --af-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --af-shadow-2: 0 8px 24px -8px rgba(15, 23, 42, 0.14);
+  --af-shadow-3: 0 24px 60px -20px rgba(15, 23, 42, 0.24);
+
+  /* === 字体系统 === */
+  --af-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --af-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* === 间距系统（8pt 网格） === */
+  --af-space-1: 4px;
+  --af-space-2: 8px;
+  --af-space-3: 12px;
+  --af-space-4: 16px;
+  --af-space-5: 24px;
+  --af-space-6: 32px;
+  --af-space-7: 48px;
+  --af-space-8: 64px;
+  --af-space-9: 96px;
+}
+
+/* === Dark Mode（通过父级 class 切换） === */
+.dark {
+  --af-background: var(--af-gray-950);
+  --af-foreground: var(--af-gray-50);
+  --af-card: var(--af-gray-900);
+  --af-card-foreground: var(--af-gray-50);
+  --af-popover: var(--af-gray-900);
+  --af-popover-foreground: var(--af-gray-50);
+  --af-primary: var(--af-gray-0);
+  --af-primary-foreground: var(--af-gray-950);
+  --af-secondary: var(--af-gray-800);
+  --af-secondary-foreground: var(--af-gray-100);
+  --af-muted: var(--af-gray-800);
+  --af-muted-foreground: var(--af-gray-400);
+  --af-border: var(--af-gray-800);
+  --af-input: var(--af-gray-800);
+  --af-ring: var(--af-gray-100);
+
+  --af-surface: var(--af-gray-900);
+  --af-surface-2: var(--af-gray-800);
+  --af-ink: var(--af-gray-50);
+  --af-ink-2: var(--af-gray-400);
+  --af-ink-3: var(--af-gray-600);
+  --af-line: var(--af-gray-800);
+  --af-brand: var(--af-gray-0);
+  --af-brand-ink: var(--af-gray-950);
+
+  --af-state-success: #22c55e;
+  --af-state-success-bg: rgba(34, 197, 94, 0.12);
+  --af-state-warning: #eab308;
+  --af-state-warning-bg: rgba(234, 179, 8, 0.12);
+  --af-state-error: #ef4444;
+  --af-state-error-bg: rgba(239, 68, 68, 0.12);
+  --af-state-info: #3b82f6;
+  --af-state-info-bg: rgba(59, 130, 246, 0.12);
+
+  --af-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.16);
+  --af-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  --af-shadow-3: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* === 基础排版工具类 === */
+.font-sans { font-family: var(--af-font-sans); }
+.font-mono { font-family: var(--af-font-mono); }
+
+/* === 滚动条极简样式 === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--af-gray-300); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: var(--af-gray-700); }

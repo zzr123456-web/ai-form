@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>版块列表页</title>
+    <style id="theme-vars">
+/* AI 辅助论坛原型 —— 现代极简设计系统 */
+
+:root {
+  /* === 品牌主色：深蓝灰，克制而有力 === */
+  --af-brand-50: #f8fafc;
+  --af-brand-100: #f1f5f9;
+  --af-brand-200: #e2e8f0;
+  --af-brand-300: #cbd5e1;
+  --af-brand-400: #94a3b8;
+  --af-brand-500: #64748b;
+  --af-brand-600: #475569;
+  --af-brand-700: #334155;
+  --af-brand-800: #1e293b;
+  --af-brand-900: #0f172a;
+
+  /* === 中性灰阶 === */
+  --af-gray-0: #ffffff;
+  --af-gray-50: #fafafa;
+  --af-gray-100: #f5f5f5;
+  --af-gray-200: #e5e5e5;
+  --af-gray-300: #d4d4d4;
+  --af-gray-400: #a3a3a3;
+  --af-gray-500: #737373;
+  --af-gray-600: #525252;
+  --af-gray-700: #404040;
+  --af-gray-800: #262626;
+  --af-gray-900: #171717;
+  --af-gray-950: #0a0a0a;
+
+  /* === 语义 Token（Light Mode） === */
+  --af-background: var(--af-gray-50);
+  --af-foreground: var(--af-gray-950);
+  --af-card: var(--af-gray-0);
+  --af-card-foreground: var(--af-gray-950);
+  --af-popover: var(--af-gray-0);
+  --af-popover-foreground: var(--af-gray-950);
+  --af-primary: var(--af-gray-950);
+  --af-primary-foreground: var(--af-gray-0);
+  --af-secondary: var(--af-gray-100);
+  --af-secondary-foreground: var(--af-gray-900);
+  --af-muted: var(--af-gray-100);
+  --af-muted-foreground: var(--af-gray-500);
+  --af-border: var(--af-gray-200);
+  --af-input: var(--af-gray-200);
+  --af-ring: var(--af-gray-950);
+  --af-radius-small: 4px;
+  --af-radius-medium: 8px;
+  --af-radius-large: 12px;
+  --af-radius-xlarge: 16px;
+
+  /* === 状态色（仅用于状态/验证/操作反馈） === */
+  --af-state-success: #16a34a;
+  --af-state-success-bg: #f0fdf4;
+  --af-state-warning: #ca8a04;
+  --af-state-warning-bg: #fefce8;
+  --af-state-error: #dc2626;
+  --af-state-error-bg: #fef2f2;
+  --af-state-info: #2563eb;
+  --af-state-info-bg: #eff6ff;
+
+  /* === 表面与阴影 === */
+  --af-surface: var(--af-gray-0);
+  --af-surface-2: var(--af-gray-100);
+  --af-ink: var(--af-gray-950);
+  --af-ink-2: var(--af-gray-600);
+  --af-ink-3: var(--af-gray-400);
+  --af-line: var(--af-gray-200);
+  --af-brand: var(--af-gray-950);
+  --af-brand-ink: var(--af-gray-0);
+
+  --af-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --af-shadow-2: 0 8px 24px -8px rgba(15, 23, 42, 0.14);
+  --af-shadow-3: 0 24px 60px -20px rgba(15, 23, 42, 0.24);
+
+  /* === 字体系统 === */
+  --af-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --af-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* === 间距系统（8pt 网格） === */
+  --af-space-1: 4px;
+  --af-space-2: 8px;
+  --af-space-3: 12px;
+  --af-space-4: 16px;
+  --af-space-5: 24px;
+  --af-space-6: 32px;
+  --af-space-7: 48px;
+  --af-space-8: 64px;
+  --af-space-9: 96px;
+}
+
+/* === Dark Mode（通过父级 class 切换） === */
+.dark {
+  --af-background: var(--af-gray-950);
+  --af-foreground: var(--af-gray-50);
+  --af-card: var(--af-gray-900);
+  --af-card-foreground: var(--af-gray-50);
+  --af-popover: var(--af-gray-900);
+  --af-popover-foreground: var(--af-gray-50);
+  --af-primary: var(--af-gray-0);
+  --af-primary-foreground: var(--af-gray-950);
+  --af-secondary: var(--af-gray-800);
+  --af-secondary-foreground: var(--af-gray-100);
+  --af-muted: var(--af-gray-800);
+  --af-muted-foreground: var(--af-gray-400);
+  --af-border: var(--af-gray-800);
+  --af-input: var(--af-gray-800);
+  --af-ring: var(--af-gray-100);
+
+  --af-surface: var(--af-gray-900);
+  --af-surface-2: var(--af-gray-800);
+  --af-ink: var(--af-gray-50);
+  --af-ink-2: var(--af-gray-400);
+  --af-ink-3: var(--af-gray-600);
+  --af-line: var(--af-gray-800);
+  --af-brand: var(--af-gray-0);
+  --af-brand-ink: var(--af-gray-950);
+
+  --af-state-success: #22c55e;
+  --af-state-success-bg: rgba(34, 197, 94, 0.12);
+  --af-state-warning: #eab308;
+  --af-state-warning-bg: rgba(234, 179, 8, 0.12);
+  --af-state-error: #ef4444;
+  --af-state-error-bg: rgba(239, 68, 68, 0.12);
+  --af-state-info: #3b82f6;
+  --af-state-info-bg: rgba(59, 130, 246, 0.12);
+
+  --af-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.16);
+  --af-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  --af-shadow-3: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* === 基础排版工具类 === */
+.font-sans { font-family: var(--af-font-sans); }
+.font-mono { font-family: var(--af-font-mono); }
+
+/* === 滚动条极简样式 === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--af-gray-300); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: var(--af-gray-700); }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--af-background);
+    --color-foreground: var(--af-foreground);
+    --color-card: var(--af-card);
+    --color-card-foreground: var(--af-card-foreground);
+    --color-popover: var(--af-popover);
+    --color-popover-foreground: var(--af-popover-foreground);
+    --color-primary: var(--af-primary);
+    --color-primary-foreground: var(--af-primary-foreground);
+    --color-secondary: var(--af-secondary);
+    --color-secondary-foreground: var(--af-secondary-foreground);
+    --color-muted: var(--af-muted);
+    --color-muted-foreground: var(--af-muted-foreground);
+    --color-border: var(--af-border);
+    --color-input: var(--af-input);
+    --color-ring: var(--af-ring);
+    --radius-sm: var(--af-radius-small);
+    --radius-md: var(--af-radius-medium);
+    --radius-lg: var(--af-radius-large);
+    --radius-xl: var(--af-radius-xlarge);
+  }
+  @layer base {
+    body { background: var(--af-background); color: var(--af-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--af-background); }
+      .text-background { color: var(--af-background); }
+      .border-background { border-color: var(--af-background); }
+      .ring-background { --tw-ring-color: var(--af-background); }
+      .bg-foreground { background-color: var(--af-foreground); }
+      .text-foreground { color: var(--af-foreground); }
+      .border-foreground { border-color: var(--af-foreground); }
+      .ring-foreground { --tw-ring-color: var(--af-foreground); }
+      .bg-card { background-color: var(--af-card); }
+      .text-card { color: var(--af-card); }
+      .border-card { border-color: var(--af-card); }
+      .ring-card { --tw-ring-color: var(--af-card); }
+      .bg-card-foreground { background-color: var(--af-card-foreground); }
+      .text-card-foreground { color: var(--af-card-foreground); }
+      .border-card-foreground { border-color: var(--af-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--af-card-foreground); }
+      .bg-popover { background-color: var(--af-popover); }
+      .text-popover { color: var(--af-popover); }
+      .border-popover { border-color: var(--af-popover); }
+      .ring-popover { --tw-ring-color: var(--af-popover); }
+      .bg-popover-foreground { background-color: var(--af-popover-foreground); }
+      .text-popover-foreground { color: var(--af-popover-foreground); }
+      .border-popover-foreground { border-color: var(--af-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--af-popover-foreground); }
+      .bg-primary { background-color: var(--af-primary); }
+      .text-primary { color: var(--af-primary); }
+      .border-primary { border-color: var(--af-primary); }
+      .ring-primary { --tw-ring-color: var(--af-primary); }
+      .bg-primary-foreground { background-color: var(--af-primary-foreground); }
+      .text-primary-foreground { color: var(--af-primary-foreground); }
+      .border-primary-foreground { border-color: var(--af-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--af-primary-foreground); }
+      .bg-secondary { background-color: var(--af-secondary); }
+      .text-secondary { color: var(--af-secondary); }
+      .border-secondary { border-color: var(--af-secondary); }
+      .ring-secondary { --tw-ring-color: var(--af-secondary); }
+      .bg-secondary-foreground { background-color: var(--af-secondary-foreground); }
+      .text-secondary-foreground { color: var(--af-secondary-foreground); }
+      .border-secondary-foreground { border-color: var(--af-secondary-foreground); }
+      .ring-secondary-foreground { --tw-ring-color: var(--af-secondary-foreground); }
+      .bg-muted { background-color: var(--af-muted); }
+      .text-muted { color: var(--af-muted); }
+      .border-muted { border-color: var(--af-muted); }
+      .ring-muted { --tw-ring-color: var(--af-muted); }
+      .bg-muted-foreground { background-color: var(--af-muted-foreground); }
+      .text-muted-foreground { color: var(--af-muted-foreground); }
+      .border-muted-foreground { border-color: var(--af-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--af-muted-foreground); }
+      .bg-border { background-color: var(--af-border); }
+      .text-border { color: var(--af-border); }
+      .border-border { border-color: var(--af-border); }
+      .ring-border { --tw-ring-color: var(--af-border); }
+      .bg-input { background-color: var(--af-input); }
+      .text-input { color: var(--af-input); }
+      .border-input { border-color: var(--af-input); }
+      .ring-input { --tw-ring-color: var(--af-input); }
+      .bg-ring { background-color: var(--af-ring); }
+      .text-ring { color: var(--af-ring); }
+      .border-ring { border-color: var(--af-ring); }
+      .ring-ring { --tw-ring-color: var(--af-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <!-- 顶部导航栏 -->
+    <header class="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm" data-dom-id="nav-header">
+        <div class="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+            <!-- 左侧：Logo 与主导航 -->
+            <div class="flex items-center gap-6">
+                <a href="./index.html" class="flex items-center gap-2 text-foreground" data-dom-id="nav-logo">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-primary-foreground">
+                        <i data-lucide="hexagon" class="h-5 w-5"></i>
+                    </div>
+                    <span class="hidden text-lg font-semibold tracking-tight sm:inline">AI Forum</span>
+                </a>
+                <nav class="hidden items-center gap-1 md:flex">
+                    <a href="./boards.html" class="rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="nav-boards">版块</a>
+                    <a href="./qa.html" class="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-dom-id="nav-qa">问答</a>
+                    <a href="./editor.html" class="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-dom-id="nav-editor">创作</a>
+                </nav>
+            </div>
+
+            <!-- 中间：搜索框 -->
+            <div class="hidden max-w-md flex-1 px-4 sm:block" data-dom-id="nav-search">
+                <div class="relative">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"></i>
+                    <input type="text" placeholder="搜索问题、帖子或版块..." class="h-9 w-full rounded-full border border-input bg-muted pl-9 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring" />
+                </div>
+            </div>
+
+            <!-- 右侧：操作区 -->
+            <div class="flex items-center gap-2">
+                <button class="hidden items-center gap-1.5 rounded-full border border-input bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:flex" data-dom-id="nav-ask">
+                    <i data-lucide="help-circle" class="h-4 w-4"></i>
+                    <span>提问</span>
+                </button>
+                <button class="flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-foreground/90" data-dom-id="nav-create">
+                    <i data-lucide="pen-line" class="h-4 w-4"></i>
+                    <span class="hidden sm:inline">发帖</span>
+                </button>
+                <button class="relative rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground" data-dom-id="nav-notifications">
+                    <i data-lucide="bell" class="h-5 w-5"></i>
+                    <span class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-state-error"></span>
+                </button>
+                <a href="./profile.html" class="ml-1 overflow-hidden rounded-full ring-2 ring-transparent hover:ring-border" data-dom-id="nav-profile">
+                    <div class="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-foreground" aria-label="用户头像">我</div>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8" data-dom-id="page-boards">
+        <!-- 面包屑与标题区 -->
+        <section class="mb-6" data-dom-id="breadcrumb-section">
+            <nav class="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <a href="./index.html" class="hover:text-foreground hover:underline">首页</a>
+                <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                <span class="text-foreground">全部版块</span>
+            </nav>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">全部版块</h1>
+                    <p class="mt-1 text-sm text-muted-foreground">浏览社区所有版块，发现感兴趣的话题与讨论。</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted-foreground">共 8 个版块</span>
+                    <button class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">
+                        <i data-lucide="list-filter" class="h-4 w-4"></i>
+                        <span>筛选</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 版块网格 -->
+        <section class="mb-8" data-dom-id="board-grid-section">
+            <h2 class="mb-4 text-lg font-semibold text-foreground">热门版块</h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-1">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="home" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+128 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">租房交流</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">房源推荐、租房避坑、合租找室友，一站解决居住问题。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 12.5k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 3.2k 关注</span>
+                    </div>
+                </article>
+
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-2">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="scale" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+86 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">法律咨询</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">劳动合同、消费者权益、房产纠纷等专业法律交流。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 8.3k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 1.8k 关注</span>
+                    </div>
+                </article>
+
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-3">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="cpu" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+245 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">科技数码</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">AI 工具、硬件评测、编程开发、前沿技术讨论。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 21.7k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 5.6k 关注</span>
+                    </div>
+                </article>
+
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-4">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="coffee" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+64 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">生活杂谈</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">日常分享、美食旅行、运动健康、情感树洞。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 15.2k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 4.1k 关注</span>
+                    </div>
+                </article>
+
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-5">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="briefcase" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+112 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">职场成长</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">求职面试、职业规划、工作效率、行业洞察。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 9.6k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 2.5k 关注</span>
+                    </div>
+                </article>
+
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-6">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="book-open" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+53 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">学习资源</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">课程推荐、读书笔记、考试经验、知识管理。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 6.4k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 1.9k 关注</span>
+                    </div>
+                </article>
+
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-7">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="gamepad-2" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+197 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">游戏娱乐</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">主机游戏、电竞赛事、桌游推荐、影视综艺。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 18.9k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 4.7k 关注</span>
+                    </div>
+                </article>
+
+                <article class="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-ring hover:shadow-md" data-dom-id="board-card-8">
+                    <div class="mb-3 flex items-start justify-between">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <i data-lucide="palette" class="h-5 w-5"></i>
+                        </div>
+                        <span class="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">+42 今日</span>
+                    </div>
+                    <h3 class="font-semibold text-foreground group-hover:text-muted-foreground">设计创意</h3>
+                    <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">UI/UX、平面设计、摄影后期、创意灵感交流。</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span class="inline-flex items-center gap-1"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> 5.1k 帖子</span>
+                        <span class="inline-flex items-center gap-1"><i data-lucide="users" class="h-3.5 w-3.5"></i> 1.4k 关注</span>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- 话题/标签筛选器 -->
+        <section class="mb-6" data-dom-id="tag-filter-section">
+            <div class="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
+                <button class="whitespace-nowrap rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-primary-foreground" data-dom-id="tag-all">全部</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-rent">租房</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-law">法律</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-tech">科技</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-life">生活</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-career">职场</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-study">学习</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-game">游戏</button>
+                <button class="whitespace-nowrap rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground hover:bg-muted" data-dom-id="tag-design">设计</button>
+            </div>
+        </section>
+
+        <!-- 主内容区：帖子列表 + 右侧边栏 -->
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <!-- 帖子列表 -->
+            <section class="lg:col-span-8" data-dom-id="post-list-section">
+                <!-- 排序控件 -->
+                <div class="mb-4 flex items-center justify-between border-b border-border pb-3">
+                    <h2 class="text-lg font-semibold text-foreground">科技数码</h2>
+                    <div class="flex items-center gap-1 rounded-lg border border-border bg-card p-1" data-dom-id="sort-controls">
+                        <button class="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-primary-foreground" data-dom-id="sort-latest">最新</button>
+                        <button class="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-dom-id="sort-hot">热门</button>
+                        <button class="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground" data-dom-id="sort-quality">优质</button>
+                    </div>
+                </div>
+
+                <!-- 帖子项 -->
+                <div class="flex flex-col gap-3">
+                    <article class="rounded-xl border border-border bg-card p-4 transition-all hover:border-ring hover:shadow-sm" data-dom-id="post-item-1">
+                        <div class="flex items-start gap-3">
+                            <div class="flex flex-col items-center gap-1 pt-1">
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-up" class="h-5 w-5"></i></button>
+                                <span class="text-sm font-semibold text-foreground">428</span>
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-down" class="h-5 w-5"></i></button>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <a href="./post.html" class="block text-base font-semibold text-foreground hover:text-muted-foreground">
+                                    ChatGPT Plus 与 Claude Pro 的实际使用对比：谁更适合中文办公场景？
+                                </a>
+                                <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">深度对比两款 AI 助手在文案改写、代码生成、长文本理解上的表现，包含具体 prompt 示例与成本分析。</p>
+                                <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <div class="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-foreground" aria-hidden="true">T</div>
+                                        <span class="text-foreground">TechLens</span>
+                                    </span>
+                                    <span>·</span>
+                                    <span>3 小时前</span>
+                                    <span>·</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="message-square" class="h-3.5 w-3.5"></i> 56 评论</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="eye" class="h-3.5 w-3.5"></i> 2.1k 浏览</span>
+                                    <span class="rounded bg-info/10 px-1.5 py-0.5 text-state-info">AI</span>
+                                    <span class="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground">效率工具</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-xl border border-border bg-card p-4 transition-all hover:border-ring hover:shadow-sm" data-dom-id="post-item-2">
+                        <div class="flex items-start gap-3">
+                            <div class="flex flex-col items-center gap-1 pt-1">
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-up" class="h-5 w-5"></i></button>
+                                <span class="text-sm font-semibold text-foreground">315</span>
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-down" class="h-5 w-5"></i></button>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <a href="./post.html" class="block text-base font-semibold text-foreground hover:text-muted-foreground">
+                                    租房合同里的这些条款，签合同前一定要擦亮眼睛
+                                </a>
+                                <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">整理了 12 个高频租房陷阱条款，附带修改建议与法律依据，适合北上广深首次租房的年轻人。</p>
+                                <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <div class="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-foreground" aria-hidden="true">L</div>
+                                        <span class="text-foreground">LegalEagle</span>
+                                    </span>
+                                    <span>·</span>
+                                    <span>5 小时前</span>
+                                    <span>·</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="message-square" class="h-3.5 w-3.5"></i> 42 评论</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="eye" class="h-3.5 w-3.5"></i> 1.5k 浏览</span>
+                                    <span class="rounded bg-info/10 px-1.5 py-0.5 text-state-info">法律</span>
+                                    <span class="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground">租房</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-xl border border-border bg-card p-4 transition-all hover:border-ring hover:shadow-sm" data-dom-id="post-item-3">
+                        <div class="flex items-start gap-3">
+                            <div class="flex flex-col items-center gap-1 pt-1">
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-up" class="h-5 w-5"></i></button>
+                                <span class="text-sm font-semibold text-foreground">289</span>
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-down" class="h-5 w-5"></i></button>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <a href="./post.html" class="block text-base font-semibold text-foreground hover:text-muted-foreground">
+                                    2024 年最值得入手的机械键盘横评：从 300 元到 1500 元
+                                </a>
+                                <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">涵盖 10 款热门配列与轴体，从声音、手感、做工、性价比四个维度打分，附购买建议。</p>
+                                <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <div class="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-foreground" aria-hidden="true">G</div>
+                                        <span class="text-foreground">GearHead</span>
+                                    </span>
+                                    <span>·</span>
+                                    <span>8 小时前</span>
+                                    <span>·</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="message-square" class="h-3.5 w-3.5"></i> 38 评论</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="eye" class="h-3.5 w-3.5"></i> 1.2k 浏览</span>
+                                    <span class="rounded bg-info/10 px-1.5 py-0.5 text-state-info">数码</span>
+                                    <span class="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground">外设</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-xl border border-border bg-card p-4 transition-all hover:border-ring hover:shadow-sm" data-dom-id="post-item-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex flex-col items-center gap-1 pt-1">
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-up" class="h-5 w-5"></i></button>
+                                <span class="text-sm font-semibold text-foreground">176</span>
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-down" class="h-5 w-5"></i></button>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <a href="./post.html" class="block text-base font-semibold text-foreground hover:text-muted-foreground">
+                                    北漂三年，我总结出的租房与通勤平衡经验
+                                </a>
+                                <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">从预算分配到地铁沿线选择，再到与中介房东的谈判技巧，分享一些真实踩坑经历。</p>
+                                <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <div class="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-foreground" aria-hidden="true">北</div>
+                                        <span class="text-foreground">北漂小林</span>
+                                    </span>
+                                    <span>·</span>
+                                    <span>12 小时前</span>
+                                    <span>·</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="message-square" class="h-3.5 w-3.5"></i> 27 评论</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="eye" class="h-3.5 w-3.5"></i> 980 浏览</span>
+                                    <span class="rounded bg-info/10 px-1.5 py-0.5 text-state-info">生活</span>
+                                    <span class="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground">租房</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-xl border border-border bg-card p-4 transition-all hover:border-ring hover:shadow-sm" data-dom-id="post-item-5">
+                        <div class="flex items-start gap-3">
+                            <div class="flex flex-col items-center gap-1 pt-1">
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-up" class="h-5 w-5"></i></button>
+                                <span class="text-sm font-semibold text-foreground">142</span>
+                                <button class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><i data-lucide="chevron-down" class="h-5 w-5"></i></button>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <a href="./post.html" class="block text-base font-semibold text-foreground hover:text-muted-foreground">
+                                    远程办公三年后，我的效率工具栈发生了哪些变化？
+                                </a>
+                                <p class="mt-1 line-clamp-2 text-sm text-muted-foreground">从 Notion 到 Obsidian，从 Slack 到 Discord，复盘一套适合自己的异步协作工作流。</p>
+                                <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <div class="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-foreground" aria-hidden="true">R</div>
+                                        <span class="text-foreground">RemoteDan</span>
+                                    </span>
+                                    <span>·</span>
+                                    <span>1 天前</span>
+                                    <span>·</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="message-square" class="h-3.5 w-3.5"></i> 19 评论</span>
+                                    <span class="inline-flex items-center gap-1"><i data-lucide="eye" class="h-3.5 w-3.5"></i> 760 浏览</span>
+                                    <span class="rounded bg-info/10 px-1.5 py-0.5 text-state-info">职场</span>
+                                    <span class="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground">效率</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- 分页 -->
+                <div class="mt-6 flex items-center justify-center gap-2" data-dom-id="pagination">
+                    <button class="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50" disabled>
+                        <i data-lucide="chevron-left" class="mr-1 h-4 w-4"></i> 上一页
+                    </button>
+                    <button class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-foreground text-sm font-medium text-primary-foreground">1</button>
+                    <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-muted">2</button>
+                    <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-muted">3</button>
+                    <span class="text-muted-foreground">...</span>
+                    <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-muted">12</button>
+                    <button class="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-muted">
+                        下一页 <i data-lucide="chevron-right" class="ml-1 h-4 w-4"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 右侧边栏 -->
+            <aside class="hidden flex-col gap-6 lg:col-span-4 lg:flex" data-dom-id="right-sidebar">
+                <!-- 热门话题 -->
+                <div class="rounded-xl border border-border bg-card p-5" data-dom-id="hot-topics-widget">
+                    <h3 class="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
+                        <i data-lucide="flame" class="h-4 w-4 text-state-error"></i>
+                        热门话题
+                    </h3>
+                    <ol class="flex flex-col gap-3">
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-foreground text-xs font-bold text-primary-foreground">1</span>
+                            <div class="min-w-0">
+                                <a href="./post.html" class="block truncate text-sm font-medium text-foreground hover:text-muted-foreground">AI 辅助编程会取代初级程序员吗？</a>
+                                <span class="text-xs text-muted-foreground">2.4k 热度</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-muted text-xs font-bold text-foreground">2</span>
+                            <div class="min-w-0">
+                                <a href="./post.html" class="block truncate text-sm font-medium text-foreground hover:text-muted-foreground">上海租房：如何识别虚假房源？</a>
+                                <span class="text-xs text-muted-foreground">1.8k 热度</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-muted text-xs font-bold text-foreground">3</span>
+                            <div class="min-w-0">
+                                <a href="./post.html" class="block truncate text-sm font-medium text-foreground hover:text-muted-foreground">被公司违法辞退，如何争取赔偿？</a>
+                                <span class="text-xs text-muted-foreground">1.5k 热度</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-muted text-xs font-bold text-foreground">4</span>
+                            <div class="min-w-0">
+                                <a href="./post.html" class="block truncate text-sm font-medium text-foreground hover:text-muted-foreground">2024 笔记本选购指南</a>
+                                <span class="text-xs text-muted-foreground">1.2k 热度</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-muted text-xs font-bold text-foreground">5</span>
+                            <div class="min-w-0">
+                                <a href="./post.html" class="block truncate text-sm font-medium text-foreground hover:text-muted-foreground">自由职业者的社保缴纳方案</a>
+                                <span class="text-xs text-muted-foreground">980 热度</span>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- 推荐版块 -->
+                <div class="rounded-xl border border-border bg-card p-5" data-dom-id="recommended-boards-widget">
+                    <h3 class="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
+                        <i data-lucide="compass" class="h-4 w-4 text-state-info"></i>
+                        推荐版块
+                    </h3>
+                    <div class="flex flex-col gap-3">
+                        <a href="./boards.html" class="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted" data-dom-id="rec-board-1">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-foreground">
+                                <i data-lucide="building-2" class="h-4 w-4"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-foreground">城市生活</p>
+                                <p class="text-xs text-muted-foreground">2.8k 关注 · 每日更新</p>
+                            </div>
+                            <button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-foreground hover:text-primary-foreground">关注</button>
+                        </a>
+                        <a href="./boards.html" class="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted" data-dom-id="rec-board-2">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-foreground">
+                                <i data-lucide="heart-pulse" class="h-4 w-4"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-foreground">健康运动</p>
+                                <p class="text-xs text-muted-foreground">1.6k 关注 · 每周精选</p>
+                            </div>
+                            <button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-foreground hover:text-primary-foreground">关注</button>
+                        </a>
+                        <a href="./boards.html" class="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted" data-dom-id="rec-board-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-foreground">
+                                <i data-lucide="plane" class="h-4 w-4"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-foreground">旅行攻略</p>
+                                <p class="text-xs text-muted-foreground">2.1k 关注 · 节假日活跃</p>
+                            </div>
+                            <button class="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-foreground hover:text-primary-foreground">关注</button>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 社区公告 -->
+                <div class="rounded-xl border border-border bg-card p-5" data-dom-id="community-notice-widget">
+                    <h3 class="mb-3 flex items-center gap-2 text-base font-semibold text-foreground">
+                        <i data-lucide="megaphone" class="h-4 w-4 text-state-warning"></i>
+                        社区公告
+                    </h3>
+                    <p class="text-sm text-muted-foreground">欢迎体验 AI 辅助论坛原型。请遵守社区规范，友善交流，共建高质量讨论氛围。</p>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="mt-12 border-t border-border bg-background" data-dom-id="site-footer">
+        <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
+                <div class="flex items-center gap-2 text-foreground">
+                    <div class="flex h-7 w-7 items-center justify-center rounded-md bg-foreground text-primary-foreground">
+                        <i data-lucide="hexagon" class="h-4 w-4"></i>
+                    </div>
+                    <span class="text-sm font-semibold">AI Forum</span>
+                </div>
+                <nav class="flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground">
+                    <a href="./index.html" class="hover:text-foreground">首页</a>
+                    <a href="./boards.html" class="hover:text-foreground">版块</a>
+                    <a href="./qa.html" class="hover:text-foreground">问答</a>
+                    <a href="./editor.html" class="hover:text-foreground">创作</a>
+                    <a href="#" class="hover:text-foreground">关于我们</a>
+                    <a href="#" class="hover:text-foreground">用户协议</a>
+                    <a href="#" class="hover:text-foreground">隐私政策</a>
+                </nav>
+                <p class="text-xs text-muted-foreground">© 2024 AI Forum. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

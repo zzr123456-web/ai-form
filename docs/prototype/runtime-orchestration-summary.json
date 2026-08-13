@@ -1,0 +1,1852 @@
+{
+  "schemaVersion": "1.0",
+  "skillProvenance": {
+    "name": "solo-design",
+    "version": "2026.07.22.00.00.00",
+    "version_source": "skill-release-manifest.json",
+    "release": "prompt-base-cloud-ssot-migration",
+    "read_status": "ok"
+  },
+  "project": {
+    "resolvedLane": "complex_html_page",
+    "intentProfile": {
+      "caseFamily": "complex_html_page",
+      "sourceType": "prd"
+    },
+    "selectedIntentWorkflowRead": true,
+    "contextRequirementsLoaded": [
+      {
+        "path": "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/page-rendering-quality-gate.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/design-artifact-validation.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/delivery-evidence-contract.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "visual-experience/visual-experience-guidelines.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "visual-experience/visual-checkpoint-protocol.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      }
+    ],
+    "contextReadScope": "complex_html_page lane: runtime contract, dispatch index, shared rendering kernel, quality gates, visual guidelines, checkpoint protocol; plus design-project-file-format and orchestration-summary-contract for skeleton creation.",
+    "readScopeLedger": [
+      {
+        "actor": "page-sub-agent",
+        "lane": "complex_html_page",
+        "path": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "reason": "page runtime guide",
+        "scopeClass": "page-runtime",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-08-11T08:05:43.749Z",
+        "nodeId": "page-index",
+        "htmlSrc": "pages/index.html"
+      },
+      {
+        "actor": "page-sub-agent",
+        "lane": "complex_html_page",
+        "path": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md",
+        "reason": "dispatch contract",
+        "scopeClass": "dispatch-contract",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-08-11T08:05:43.749Z",
+        "nodeId": "page-index",
+        "htmlSrc": "pages/index.html"
+      }
+    ],
+    "dispatchPreflightManifest": [
+      {
+        "recorded_at": "2026-08-11T08:05:43.749Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-index",
+        "htmlSrc": "pages/index.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/index.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/index.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\" --node-id=\"page-index\" --html-src=\"pages/index.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css",
+        "htmlFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\index.html",
+        "brandPrefix": "af",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\index.html\" --title=\"首页\" --lang=\"zh-CN\" --prefix=\"af\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": null,
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ai-forum-prototype.design": "8c17974a7f7cc92aa5cb9c593a138db9a7aacdf3f91666b79830ad830a3dd692"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-08-11T08:05:43.749Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-boards",
+        "htmlSrc": "pages/boards.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/boards.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/boards.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\" --node-id=\"page-boards\" --html-src=\"pages/boards.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css",
+        "htmlFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\boards.html",
+        "brandPrefix": "af",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\boards.html\" --title=\"版块列表页\" --lang=\"zh-CN\" --prefix=\"af\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": null,
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ai-forum-prototype.design": "8c17974a7f7cc92aa5cb9c593a138db9a7aacdf3f91666b79830ad830a3dd692"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-08-11T08:05:43.749Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-post",
+        "htmlSrc": "pages/post.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/post.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/post.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\" --node-id=\"page-post\" --html-src=\"pages/post.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css",
+        "htmlFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\post.html",
+        "brandPrefix": "af",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\post.html\" --title=\"帖子详情页\" --lang=\"zh-CN\" --prefix=\"af\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": null,
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ai-forum-prototype.design": "8c17974a7f7cc92aa5cb9c593a138db9a7aacdf3f91666b79830ad830a3dd692"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-08-11T08:05:43.749Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-editor",
+        "htmlSrc": "pages/editor.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/editor.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/editor.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\" --node-id=\"page-editor\" --html-src=\"pages/editor.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css",
+        "htmlFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\editor.html",
+        "brandPrefix": "af",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\editor.html\" --title=\"发帖编辑页\" --lang=\"zh-CN\" --prefix=\"af\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": null,
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ai-forum-prototype.design": "8c17974a7f7cc92aa5cb9c593a138db9a7aacdf3f91666b79830ad830a3dd692"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-08-11T08:05:43.749Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-qa",
+        "htmlSrc": "pages/qa.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/qa.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/qa.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\" --node-id=\"page-qa\" --html-src=\"pages/qa.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css",
+        "htmlFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\qa.html",
+        "brandPrefix": "af",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\qa.html\" --title=\"AI 答疑页\" --lang=\"zh-CN\" --prefix=\"af\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": null,
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ai-forum-prototype.design": "8c17974a7f7cc92aa5cb9c593a138db9a7aacdf3f91666b79830ad830a3dd692"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-08-11T08:05:43.749Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-search",
+        "htmlSrc": "pages/search.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/search.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/search.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\" --node-id=\"page-search\" --html-src=\"pages/search.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css",
+        "htmlFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\search.html",
+        "brandPrefix": "af",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\search.html\" --title=\"搜索结果页\" --lang=\"zh-CN\" --prefix=\"af\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": null,
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ai-forum-prototype.design": "8c17974a7f7cc92aa5cb9c593a138db9a7aacdf3f91666b79830ad830a3dd692"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      },
+      {
+        "recorded_at": "2026-08-11T08:05:43.749Z",
+        "generatedBy": "build-page-dispatch-manifest.mjs",
+        "packetType": "ComplexPagePacket",
+        "laneContract": {
+          "resolvedLane": "complex_html_page",
+          "packetType": "ComplexPagePacket",
+          "pageRuntimeGuide": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+          "dispatchContract": "intent-workflows/intent-project-complex-build/complex-page-dispatch-contract.md"
+        },
+        "taskLinePresent": true,
+        "outputPathPresent": true,
+        "sharedTemplate": "intent-workflows/intent-project-complex-build/complex-page-runtime.md",
+        "nodeId": "page-profile",
+        "htmlSrc": "pages/profile.html",
+        "supplementaryReads": [],
+        "allowedWritePaths": [
+          "pages/profile.html",
+          "assets/"
+        ],
+        "forbiddenWriteRoots": [
+          "*.design",
+          "runtime-orchestration-summary.json",
+          "validation-report.json",
+          "finish-readiness-report.json",
+          "restore-contract-report.json",
+          "page-generation-summary.json"
+        ],
+        "toolPolicy": {
+          "todoWriteAllowed": false,
+          "validationScriptsAllowed": false,
+          "previewAllowed": false,
+          "helperScriptsAllowed": false,
+          "designFileWriteAllowed": false,
+          "allowedWritePaths": [
+            "pages/profile.html",
+            "assets/"
+          ]
+        },
+        "skillRuntime": {
+          "skillDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design",
+          "deterministicToolDir": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling",
+          "toolPaths": {
+            "applyHtmlHeadContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs",
+            "recordDispatchCompletion": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs",
+            "buildPageDispatchManifest": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\build-page-dispatch-manifest.mjs",
+            "validateDesignWorkspace": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-design-workspace.mjs",
+            "validateFinishReadiness": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs",
+            "validateRestoreContract": "c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-restore-contract.mjs"
+          },
+          "requiredForPageSubAgent": [
+            "applyHtmlHeadContract",
+            "recordDispatchCompletion"
+          ],
+          "pathInjection": "absolute",
+          "pathContract": "Do not use {SKILL_DIR} placeholders inside Page Sub-Agent packets; use toolPaths.* absolute paths.",
+          "commandTemplates": {
+            "recordDispatchCompletion": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\record-dispatch-completion.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\" --node-id=\"page-profile\" --html-src=\"pages/profile.html\" --status=completed --changed-files=<comma-separated-project-relative-files> --trace-digest=<main-agent-runtime-trace-digest> --tool-ledger-json=<tool-ledger-json-or-file>"
+          }
+        },
+        "cssFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css",
+        "htmlFilePath": "c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\profile.html",
+        "brandPrefix": "af",
+        "aestheticsMode": "free-explore",
+        "toolDisciplineBlockPresent": true,
+        "fillHtmlHeadCommand": "node \"c:\\Users\\空间几何\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\apply-html-head-contract.mjs\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\colors_and_type.css\" \"c:\\Users\\空间几何\\Desktop\\zhuzirui\\ai-forum-prototype\\pages\\profile.html\" --title=\"个人主页\" --lang=\"zh-CN\" --prefix=\"af\"",
+        "headFillMode": "skeleton-first",
+        "viewportMode": null,
+        "completionSchemaExpected": "full",
+        "restoreFields": null,
+        "restoreContractStatus": null,
+        "restoreCompactPacket": null,
+        "deterministicCommands": null,
+        "sourceAuthorityLock": null,
+        "preDispatchFileHashes": {
+          "ai-forum-prototype.design": "8c17974a7f7cc92aa5cb9c593a138db9a7aacdf3f91666b79830ad830a3dd692"
+        },
+        "contextPreflight": {
+          "workflowPath": "intent-workflows/intent-project-complex-build/INTENT_WORKFLOW.md",
+          "requiredContextFiles": [
+            "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+            "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+            "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+            "delivery-quality/page-rendering-quality-gate.md",
+            "delivery-quality/design-artifact-validation.md",
+            "delivery-quality/delivery-evidence-contract.md",
+            "visual-experience/visual-experience-guidelines.md",
+            "visual-experience/visual-checkpoint-protocol.md"
+          ],
+          "optionalContextFiles": [],
+          "passed": true
+        },
+        "pageSliceOnly": true,
+        "requiredFieldsPresent": true,
+        "missingFields": [],
+        "fillHtmlHeadCommandValid": true,
+        "mobileNavigation": {
+          "required": false,
+          "appliesToThisPage": false,
+          "canonicalHtmlIncluded": false,
+          "missingFields": []
+        },
+        "persistedToSummary": true,
+        "taskQueryAudited": false,
+        "proofSource": "summary-only",
+        "largeWorkflowFilesInTaskQuery": null
+      }
+    ],
+    "validationRunDiscipline": {
+      "maxFullValidationRuns": 2,
+      "softWarningsTriggerRepair": false,
+      "blockingRepairMode": "targeted-once",
+      "forbiddenRepairTriggers": [
+        "soft-warning-only",
+        "provenance-warning-only",
+        "style-warning-only"
+      ]
+    },
+    "validationHistory": [
+      {
+        "reportPath": "validation-report.json",
+        "reportHash": "738dde25c1a4fd8e689ad2c9ac3731ea0ce1dbd9c7e4187c9ac522faccd0fa2c",
+        "checkedAt": "2026-08-11T08:21:40.658Z",
+        "success": false,
+        "exitCode": 1,
+        "renderBlockingErrorCount": 16,
+        "repairPlanHints": [
+          "external-image-url",
+          "external-image-url"
+        ],
+        "errorSignatures": [
+          {
+            "errorClass": "artifact-readiness",
+            "normalized": "[design-file] Validation failed for .design file batch: ======================================== [FAIL] Validation failed ---------------------------------------- Found 80 issues: 1. [data[0].devMetadata.interactions[0].domId] must be a non-empty string 2. [data[0].devMetadata.interactions[0].targetPageId] must be a non-empty string 3. [data[0].devMetadata.interactions[1].domId] must be a non-empty string 4. [data[0].devMetadata.interactions[1].targetPageId] must be a non-empty string 5. [data[0].devMetadata.interactions[2].domId] must be a non-empty string 6. [data[0].devMetadata.interactions[2].targetPageId] must be a non-empty string 7. [data[0].devMetadata.interactions[3].domId] must be a non-empty string 8. [data[0].devMetadata.interactions[3].targetPageId] must be a non-empty string 9. [data[0].devMetadata.interactions[4].domId] must be a non-empty string 10. [data[0].devMetadata.interactions[4].targetPageId] must be a non-empty string 11. [data[0].devMetadata.interactions[5].domId] must be a non-empty string 12. [data[0].devMetadata.interactions[5].targetPageId] must be a non-empty string 13. [data[0].devMetadata.interactions[6].domId] must be a non-empty string 14. [data[0].devMetadata.interactions[6].targetPageId] must be a non-empty string 15. [data[1].devMetadata.interactions[0].domId] must be a non-empty string 16. [data[1].devMetadata.interactions[0].targetPageId] must be a non-empty string 17. [data[1].devMetadata.interactions[1].domId] must be a non-empty string 18. [data[1].devMetadata.interactions[1].targetPageId] must be a non-empty string 19. [data[1].devMetadata.interactions[2].domId] must be a non-empty string 20. [data[1].devMetadata.interactions[2].targetPageId] must be a non-empty string 21. [data[1].devMetadata.interactions[3].domId] must be a non-empty string 22. [data[1].devMetadata.interactions[3].targetPageId] must be a non-empty string 23. [data[1].devMetadata.interactions[4].domId] must be a non-empty string 24. [data[1].devMetadata.interactions[4].targetPageId] must be a non-empty string 25. [data[2].devMetadata.interactions[0].domId] must be a non-empty string 26. [data[2].devMetadata.interactions[0].targetPageId] must be a non-empty string 27. [data[2].devMetadata.interactions[1].domId] must be a non-empty string 28. [data[2].devMetadata.interactions[1].targetPageId] must be a non-empty string 29. [data[2].devMetadata.interactions[2].domId] must be a non-empty string 30. [data[2].devMetadata.interactions[2].targetPageId] must be a non-empty string 31. [data[2].devMetadata.interactions[3].domId] must be a non-empty string 32. [data[2].devMetadata.interactions[3].targetPageId] must be a non-empty string 33. [data[2].devMetadata.interactions[4].domId] must be a non-empty string 34. [data[2].devMetadata.interactions[4].targetPageId] must be a non-empty string 35. [data[2].devMetadata.interactions[5].domId] must be a non-empty string 36. [data[2].devMetadata.interactions[5].targetPageId] must be a non-empty string 37. [data[3].devMetadata.interactions[0].domId] must be a non-empty string 38. [data[3].devMetadata.interactions[0].targetPageId] must be a non-empty string 39. [data[3].devMetadata.interactions[1].domId] must be a non-empty string 40. [data[3].devMetadata.interactions[1].targetPageId] must be a non-empty string 41. [data[3].devMetadata.interactions[2].domId] must be a non-empty string 42. [data[3].devMetadata.interactions[2].targetPageId] must be a non-empty string 43. [data[3].devMetadata.interactions[3].domId] must be a non-empty string 44. [data[3].devMetadata.interactions[3].targetPageId] must be a non-empty string 45. [data[4].devMetadata.interactions[0].domId] must be a non-empty string 46. [data[4].devMetadata.interactions[0].targetPageId] must be a non-empty string 47. [data[4].devMetadata.interactions[1].domId] must be a non-empty string 48. [data[4].devMetadata.interactions[1].targetPageId] must be a non-empty string 49. [data[4].devMetadata.interactions[2].domId] must be a non-empty string 50. [data[4].devMetadata.interactions[2].targetPageId] must be a non-empty string 51. [data[4].devMetadata.interactions[3].domId] must be a non-empty string 52. [data[4].devMetadata.interactions[3].targetPageId] must be a non-empty string 53. [data[4].devMetadata.interactions[4].domId] must be a non-empty string 54. [data[4].devMetadata.interactions[4].targetPageId] must be a non-empty string 55. [data[4].devMetadata.interactions[5].domId] must be a non-empty string 56. [data[4].devMetadata.interactions[5].targetPageId] must be a non-empty string 57. [data[5].devMetadata.interactions[0].domId] must be a non-empty string 58. [data[5].devMetadata.interactions[0].targetPageId] must be a non-empty string 59. [data[5].devMetadata.interactions[1].domId] must be a non-empty string 60. [data[5].devMetadata.interactions[1].targetPageId] must be a non-empty string 61. [data[5].devMetadata.interactions[2].domId] must be a non-empty string 62. [data[5].devMetadata.interactions[2].targetPageId] must be a non-empty string 63. [data[5].devMetadata.interactions[3].domId] must be a non-empty string 64. [data[5].devMetadata.interactions[3].targetPageId] must be a non-empty string 65. [data[5].devMetadata.interactions[4].domId] must be a non-empty string 66. [data[5].devMetadata.interactions[4].targetPageId] must be a non-empty string 67. [data[5].devMetadata.interactions[5].domId] must be a non-empty string 68. [data[5].devMetadata.interactions[5].targetPageId] must be a non-empty string 69. [data[6].devMetadata.interactions[0].domId] must be a non-empty string 70. [data[6].devMetadata.interactions[0].targetPageId] must be a non-empty string 71. [data[6].devMetadata.interactions[1].domId] must be a non-empty string 72. [data[6].devMetadata.interactions[1].targetPageId] must be a non-empty string 73. [data[6].devMetadata.interactions[2].domId] must be a non-empty string 74. [data[6].devMetadata.interactions[2].targetPageId] must be a non-empty string 75. [data[6].devMetadata.interactions[3].domId] must be a non-empty string 76. [data[6].devMetadata.interactions[3].targetPageId] must be a non-empty string 77. [data[6].devMetadata.interactions[4].domId] must be a non-empty string 78. [data[6].devMetadata.interactions[4].targetPageId] must be a non-empty string 79. [data[6].devMetadata.interactions[5].domId] must be a non-empty string 80. [data[6].devMetadata.interactions[5].targetPageId] must be a non-empty string ========================================",
+            "signature": "6a9ce27e295912cfd39a4e01437956cb9bbe9422d6a991ecb731bff7503f3b95"
+          },
+          {
+            "errorClass": "dispatch-preflight-or-ownership",
+            "normalized": "[dispatch-changed-files] project.expectedDispatches[] is required when dispatchPreflightManifest[] exists",
+            "signature": "1863095a5236c379a633d22a8424261bfcde770ff9ab246147a2326cba87f6fd"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] boards.html: external/base64 image source is forbidden: https://api.dicebear.com/7.x/avataaars/svg?seed=user1",
+            "signature": "67877ba26b6dcecfdf27a34c36f088aff5e69d8b6a878545b9e63f12049d96a1"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] boards.html: external/base64 image source is forbidden: https://api.dicebear.com/7.x/avataaars/svg?seed=tech01",
+            "signature": "f275c83e7d5238a525b5d0d98e252b1196446041e4c81aa792a5fcd3792832af"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] boards.html: external/base64 image source is forbidden: https://api.dicebear.com/7.x/avataaars/svg?seed=law02",
+            "signature": "84d5c359e0aa3c98a03666ad92e86107a6cca0fff51d696cea8ab75dc9ddbdfe"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] boards.html: external/base64 image source is forbidden: https://api.dicebear.com/7.x/avataaars/svg?seed=gear03",
+            "signature": "e525579f637709c441361297fd860172658b1ad8e2762b010580dbd409fd845b"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] boards.html: external/base64 image source is forbidden: https://api.dicebear.com/7.x/avataaars/svg?seed=life04",
+            "signature": "ef862dff556b6e8213c8ffa3162aed36f6f1832ab84f2b002c9a013c0118b3c5"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] boards.html: external/base64 image source is forbidden: https://api.dicebear.com/7.x/avataaars/svg?seed=work05",
+            "signature": "225e7c8a2b8003e7586a9f0430fff1a1f1e4c8853e05a4e4b1d5de1a6f53c830"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] post.html: external/base64 image source is forbidden: https://api.dicebear.com/9.x/avataaars/svg?seed=currentUser",
+            "signature": "c1e59349c1e62788915d5c73774a5f5cd805e945b2f109a33401c13a35d06d11"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] post.html: external/base64 image source is forbidden: https://api.dicebear.com/9.x/avataaars/svg?seed=alice",
+            "signature": "2c9acabc52afda9edd62e2abdee51fd187b308422c04f0f80f924ae7c194540f"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] post.html: external/base64 image source is forbidden: https://api.dicebear.com/9.x/avataaars/svg?seed=bob",
+            "signature": "8d0239f8a2125c6fe429ca630dbfa9c55ac0eb0ce760b762e87ef50c957d4145"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] post.html: external/base64 image source is forbidden: https://api.dicebear.com/9.x/avataaars/svg?seed=carol",
+            "signature": "130f900284e3f7810e44ba7c082bea4fa7225271d7a48cf6e401b1da2ed7d045"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] post.html: external/base64 image source is forbidden: https://api.dicebear.com/9.x/avataaars/svg?seed=dave",
+            "signature": "f172b466017941b757705f1c25f6a15916a713384d594906e3cd7fc1555e9de6"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] post.html: external/base64 image source is forbidden: https://api.dicebear.com/9.x/avataaars/svg?seed=eve",
+            "signature": "2127042389489af231abf0fb958597fa781876e4699ce7299f4d0812a2f0d928"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] post.html: external/base64 image source is forbidden: https://api.dicebear.com/9.x/avataaars/svg?seed=frank",
+            "signature": "0f3698d4be59627d5dc4899f962dbb522dae94e9b3ac71767ca77b2ed1653b52"
+          },
+          {
+            "errorClass": "html-quality",
+            "normalized": "[html-quality] search.html: image references missing asset file: ../assets/avatar-default.png",
+            "signature": "90edbd25016bd93da89ae2722635664e2ba8bfd7dd56d4a0fb2765edabddea52"
+          }
+        ],
+        "terminalState": null
+      },
+      {
+        "reportPath": "validation-report.json",
+        "reportHash": "ac1c64e036a9200366433cf1307c55da00243cf7d878822e6baab263fc295acd",
+        "checkedAt": "2026-08-11T08:35:20.216Z",
+        "success": false,
+        "exitCode": 1,
+        "renderBlockingErrorCount": 8,
+        "repairPlanHints": [],
+        "errorSignatures": [
+          {
+            "errorClass": "artifact-readiness",
+            "normalized": "[design-file] Validation failed for .design file batch: ======================================== [FAIL] Validation failed ---------------------------------------- Found 6 issues: 1. [data[1].devMetadata.interactions[5].domId] domId \"board-post-1\" is registered in .design but not found in HTML file \"pages/boards.html\". Fix: add data-dom-id=\"board-post-1\" to the corresponding element in the HTML file, or remove this interaction entry if the link no longer exists. 2. [data[2].devMetadata.interactions[6].domId] domId \"post-author\" is registered in .design but not found in HTML file \"pages/post.html\". Fix: add data-dom-id=\"post-author\" to the corresponding element in the HTML file, or remove this interaction entry if the link no longer exists. 3. [data[3].devMetadata.interactions[3].domId] domId \"nav-search\" is registered in .design but not found in HTML file \"pages/editor.html\". Fix: add data-dom-id=\"nav-search\" to the corresponding element in the HTML file, or remove this interaction entry if the link no longer exists. 4. [data[3].devMetadata.interactions[4].domId] domId \"publish-btn\" is registered in .design but not found in HTML file \"pages/editor.html\". Fix: add data-dom-id=\"publish-btn\" to the corresponding element in the HTML file, or remove this interaction entry if the link no longer exists. 5. [data[5].devMetadata.interactions[6].domId] domId \"search-post-1\" is registered in .design but not found in HTML file \"pages/search.html\". Fix: add data-dom-id=\"search-post-1\" to the corresponding element in the HTML file, or remove this interaction entry if the link no longer exists. 6. [data[5].devMetadata.interactions[7].domId] domId \"search-user-1\" is registered in .design but not found in HTML file \"pages/search.html\". Fix: add data-dom-id=\"search-user-1\" to the corresponding element in the HTML file, or remove this interaction entry if the link no longer exists. ========================================",
+            "signature": "d6fe1f1fdeaf9a700fff2d81740e0a99ad434ffc62f6bd236fa4cb005b4fac3c"
+          },
+          {
+            "errorClass": "dispatch-changed-files",
+            "normalized": "[dispatch-changed-files] pages/index.html: completed dispatch requires toolCallLedger for strict ownership audit",
+            "signature": "0caad12543ad3f58880016cfd2ab35c75d3f650a8f9a442fad8724d842625e47"
+          },
+          {
+            "errorClass": "dispatch-changed-files",
+            "normalized": "[dispatch-changed-files] pages/boards.html: completed dispatch requires toolCallLedger for strict ownership audit",
+            "signature": "bb5e2f45c0e705b8e8fa1175508a3412a3a4dd0b79d1e54f2e066b36bace6730"
+          },
+          {
+            "errorClass": "dispatch-changed-files",
+            "normalized": "[dispatch-changed-files] pages/post.html: completed dispatch requires toolCallLedger for strict ownership audit",
+            "signature": "d296388b1ccc1f92691ef43a742383feb541846fb6ec6542456a9bc87c835c29"
+          },
+          {
+            "errorClass": "dispatch-changed-files",
+            "normalized": "[dispatch-changed-files] pages/editor.html: completed dispatch requires toolCallLedger for strict ownership audit",
+            "signature": "f6afa40415239e580c01012d4dce74823f0c78de36a70d1c2f98d3ad533feecb"
+          },
+          {
+            "errorClass": "dispatch-changed-files",
+            "normalized": "[dispatch-changed-files] pages/qa.html: completed dispatch requires toolCallLedger for strict ownership audit",
+            "signature": "22f3c05031dae88bb88932ea3574d4dc6ccd7b5d16bca48bc0aa2ab739d207b6"
+          },
+          {
+            "errorClass": "dispatch-changed-files",
+            "normalized": "[dispatch-changed-files] pages/search.html: completed dispatch requires toolCallLedger for strict ownership audit",
+            "signature": "3ffdf889e48b44ddadfddac4c4c7069f497fa61badb4179915662be53b2c1a7c"
+          },
+          {
+            "errorClass": "dispatch-changed-files",
+            "normalized": "[dispatch-changed-files] pages/profile.html: completed dispatch requires toolCallLedger for strict ownership audit",
+            "signature": "f3993fb8ed84d77c54afba6b60d1c1f14a5c8e84e2b8379b096624d1733b4cfc"
+          }
+        ],
+        "terminalState": null
+      },
+      {
+        "reportPath": "validation-report.json",
+        "reportHash": "c92bc29fa4af00db692b4f06ff88828cee4d82e45ca391c002ecd6674781f22d",
+        "checkedAt": "2026-08-11T08:54:39.352Z",
+        "success": true,
+        "exitCode": 0,
+        "renderBlockingErrorCount": 0,
+        "repairPlanHints": [],
+        "errorSignatures": [],
+        "terminalState": null
+      }
+    ],
+    "validationRepairLedger": [
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "738dde25c1a4fd8e689ad2c9ac3731ea0ce1dbd9c7e4187c9ac522faccd0fa2c",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-11T08:26:50.447Z",
+        "repairEntryStatus": "started-awaiting-owner-batch-repair",
+        "ownerTriage": [
+          {
+            "owner": "sub-agent",
+            "errorClass": "external-image-url",
+            "affectedFiles": [
+              "boards.html"
+            ],
+            "repairScope": "targeted-path-fix",
+            "strategy": "fix_image_paths_once"
+          },
+          {
+            "owner": "sub-agent",
+            "errorClass": "external-image-url",
+            "affectedFiles": [
+              "post.html"
+            ],
+            "repairScope": "targeted-path-fix",
+            "strategy": "fix_image_paths_once"
+          }
+        ],
+        "repairPlanHints": [
+          {
+            "errorClass": "external-image-url",
+            "owner": "sub-agent",
+            "repairScope": "targeted-path-fix",
+            "strategy": "fix_image_paths_once",
+            "affectedFiles": [
+              "boards.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          },
+          {
+            "errorClass": "external-image-url",
+            "owner": "sub-agent",
+            "repairScope": "targeted-path-fix",
+            "strategy": "fix_image_paths_once",
+            "affectedFiles": [
+              "post.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          }
+        ],
+        "repairActions": [],
+        "revalidationReportPath": null,
+        "revalidationReportHash": null,
+        "revalidationSuccess": null,
+        "blockedReason": null
+      },
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "ac1c64e036a9200366433cf1307c55da00243cf7d878822e6baab263fc295acd",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-11T08:44:53.266Z",
+        "repairEntryStatus": "revalidated-success",
+        "ownerTriage": [
+          {
+            "owner": "main-agent",
+            "errorClass": "artifact-readiness",
+            "affectedFiles": [],
+            "repairScope": "repair_design_registration_or_file_reference_only",
+            "strategy": "read .design and affected file metadata only"
+          },
+          {
+            "owner": "main-agent",
+            "errorClass": "unknown-blocking",
+            "affectedFiles": [],
+            "repairScope": "read validation report, classify owner, then use the narrowest targeted repair",
+            "strategy": "no validator source read; targeted affected-file excerpt only"
+          },
+          {
+            "owner": "main-agent",
+            "errorClass": "unknown-blocking",
+            "affectedFiles": [],
+            "repairScope": "read validation report, classify owner, then use the narrowest targeted repair",
+            "strategy": "no validator source read; targeted affected-file excerpt only"
+          },
+          {
+            "owner": "main-agent",
+            "errorClass": "unknown-blocking",
+            "affectedFiles": [],
+            "repairScope": "read validation report, classify owner, then use the narrowest targeted repair",
+            "strategy": "no validator source read; targeted affected-file excerpt only"
+          },
+          {
+            "owner": "main-agent",
+            "errorClass": "unknown-blocking",
+            "affectedFiles": [],
+            "repairScope": "read validation report, classify owner, then use the narrowest targeted repair",
+            "strategy": "no validator source read; targeted affected-file excerpt only"
+          },
+          {
+            "owner": "main-agent",
+            "errorClass": "unknown-blocking",
+            "affectedFiles": [],
+            "repairScope": "read validation report, classify owner, then use the narrowest targeted repair",
+            "strategy": "no validator source read; targeted affected-file excerpt only"
+          },
+          {
+            "owner": "main-agent",
+            "errorClass": "unknown-blocking",
+            "affectedFiles": [],
+            "repairScope": "read validation report, classify owner, then use the narrowest targeted repair",
+            "strategy": "no validator source read; targeted affected-file excerpt only"
+          },
+          {
+            "owner": "main-agent",
+            "errorClass": "unknown-blocking",
+            "affectedFiles": [],
+            "repairScope": "read validation report, classify owner, then use the narrowest targeted repair",
+            "strategy": "no validator source read; targeted affected-file excerpt only"
+          }
+        ],
+        "repairPlanHints": [],
+        "repairActions": [
+          {
+            "owner": "main-agent",
+            "errorClass": "artifact-readiness",
+            "affectedFiles": [
+              "pages/boards.html",
+              "pages/post.html",
+              "pages/editor.html",
+              "pages/search.html"
+            ],
+            "action": "repair_design_registration_or_file_reference_only",
+            "observedFileHashes": [
+              {
+                "path": "pages/boards.html",
+                "hash": "fa0d0d20ae0ebd7e7c9e80f522ec6acf717881ccc69f88225674ed8e9009e63b"
+              },
+              {
+                "path": "pages/post.html",
+                "hash": "b3318f30c87f24838c7cbc69775c927ca30352ff41eb652fc465b7c9a12ac480"
+              },
+              {
+                "path": "pages/editor.html",
+                "hash": "29f95f873830552bd266af7321d9235cb3c720688b304c1c09ea020a59821fd0"
+              },
+              {
+                "path": "pages/search.html",
+                "hash": "4c3e339aef2dd69eaa371344837a5091867c37761a90c5282e529992ef0671c5"
+              }
+            ],
+            "preEditFileHashes": [],
+            "postEditFileHashes": [],
+            "repairOwnedFields": [
+              "artifact-readiness"
+            ],
+            "recordedAt": "2026-08-11T08:45:13.231Z",
+            "repairActionTableRequired": true
+          }
+        ],
+        "revalidationReportPath": "validation-report.json",
+        "revalidationReportHash": "c92bc29fa4af00db692b4f06ff88828cee4d82e45ca391c002ecd6674781f22d",
+        "revalidationSuccess": true,
+        "blockedReason": null,
+        "revalidationRecordedAt": "2026-08-11T08:54:53.382Z"
+      }
+    ],
+    "validationSnapshot": {},
+    "artifactReadinessEvidence": {},
+    "expectedDispatches": [
+      {
+        "nodeId": "page-index",
+        "pageId": "page-index",
+        "targetPageId": "page-index",
+        "htmlSrc": "pages/index.html",
+        "packetType": "ComplexPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/index.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "page-index-trace-20260811",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-11T08:54:24.269Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-boards",
+        "pageId": "page-boards",
+        "targetPageId": "page-boards",
+        "htmlSrc": "pages/boards.html",
+        "packetType": "ComplexPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/boards.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "page-boards-trace-20260811",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-11T08:54:24.372Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-post",
+        "pageId": "page-post",
+        "targetPageId": "page-post",
+        "htmlSrc": "pages/post.html",
+        "packetType": "ComplexPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/post.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "page-post-trace-20260811",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-11T08:54:24.495Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-editor",
+        "pageId": "page-editor",
+        "targetPageId": "page-editor",
+        "htmlSrc": "pages/editor.html",
+        "packetType": "ComplexPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/editor.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "page-editor-trace-20260811",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-11T08:54:24.597Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-qa",
+        "pageId": "page-qa",
+        "targetPageId": "page-qa",
+        "htmlSrc": "pages/qa.html",
+        "packetType": "ComplexPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/qa.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "page-qa-trace-20260811",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-11T08:54:24.696Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-search",
+        "pageId": "page-search",
+        "targetPageId": "page-search",
+        "htmlSrc": "pages/search.html",
+        "packetType": "ComplexPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/search.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "page-search-trace-20260811",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-11T08:54:24.800Z",
+        "source": "record-dispatch-completion.mjs"
+      },
+      {
+        "nodeId": "page-profile",
+        "pageId": "page-profile",
+        "targetPageId": "page-profile",
+        "htmlSrc": "pages/profile.html",
+        "packetType": "ComplexPagePacket",
+        "status": "completed",
+        "changedFiles": [
+          "pages/profile.html"
+        ],
+        "toolCallLedger": {
+          "source": "main-agent-runtime-trace",
+          "traceDigest": "page-profile-trace-20260811",
+          "todoWriteCalls": 0,
+          "previewCalls": 0,
+          "validationScriptCalls": 0,
+          "helperScriptWrites": 0
+        },
+        "recordedAt": "2026-08-11T08:54:24.899Z",
+        "source": "record-dispatch-completion.mjs"
+      }
+    ],
+    "mainAgentPostDispatchMutations": [
+      {
+        "path": "ai-forum-prototype.design",
+        "reason": "registered page nodes and navigation interactions"
+      },
+      {
+        "path": "runtime-orchestration-summary.json",
+        "reason": "updated generation status, wiring plan, and dispatch ledger"
+      }
+    ],
+    "operation": "create",
+    "projectName": "AI 辅助论坛原型",
+    "designProjectPath": "c:/Users/空间几何/Desktop/zhuzirui/ai-forum-prototype",
+    "deviceType": "desktop",
+    "designRead": "AI forum / general-interest Chinese users / modern minimal / information-dense task-driven / avoid generic 3-card hero and neon gradients",
+    "designDials": {
+      "layoutVariance": 3,
+      "motionIntensity": 2,
+      "visualDensity": 4
+    },
+    "lowValueCallWatchdog": {
+      "applies": true,
+      "noProgressNextAction": "halt and report summary of current progress and blockers"
+    },
+    "visualQualityCheckpoints": [
+      {
+        "checkpointId": "vq-anchor",
+        "dimension": "visual-anchor",
+        "expected": "A clean top navigation plus a focused content feed as the dominant first-screen structure; no decorative hero image needed for an information-dense forum.",
+        "evidenceTarget": "pages/index.html#top-nav-and-feed"
+      },
+      {
+        "checkpointId": "vq-hierarchy",
+        "dimension": "information-hierarchy",
+        "expected": "Primary navigation, secondary filters/tags, and tertiary meta actions are separated by spacing, weight, and surface; AI features are visually distinct but not louder than content.",
+        "evidenceTarget": "all-pages#content-hierarchy"
+      },
+      {
+        "checkpointId": "vq-structure",
+        "dimension": "composition-structure",
+        "expected": "Centered max-width container with clear column rhythm; cards use subtle border or surface layering; generous whitespace consistent with modern minimalism.",
+        "evidenceTarget": "all-pages#layout-grid"
+      },
+      {
+        "checkpointId": "vq-implementation",
+        "dimension": "implementation-strategy",
+        "expected": "CSS variable driven theme, Lucide icons, Tailwind semantic utilities, static critical-layout CSS for shell; no external image assets required for wireframe-like prototype.",
+        "evidenceTarget": "colors_and_type.css + pages/*.html"
+      }
+    ],
+    "generationTree": {
+      "mirroredFrom": "generation-tree.json",
+      "root": {
+        "nodeId": "root",
+        "nodeType": "root",
+        "title": "AI 辅助论坛原型",
+        "status": "generated",
+        "children": [
+          {
+            "nodeId": "page-index",
+            "nodeType": "leaf",
+            "title": "首页",
+            "htmlSrc": "pages/index.html",
+            "status": "generated",
+            "dependencies": []
+          },
+          {
+            "nodeId": "page-boards",
+            "nodeType": "leaf",
+            "title": "版块列表页",
+            "htmlSrc": "pages/boards.html",
+            "status": "generated",
+            "dependencies": []
+          },
+          {
+            "nodeId": "page-post",
+            "nodeType": "leaf",
+            "title": "帖子详情页",
+            "htmlSrc": "pages/post.html",
+            "status": "generated",
+            "dependencies": []
+          },
+          {
+            "nodeId": "page-editor",
+            "nodeType": "leaf",
+            "title": "发帖编辑页",
+            "htmlSrc": "pages/editor.html",
+            "status": "generated",
+            "dependencies": []
+          },
+          {
+            "nodeId": "page-qa",
+            "nodeType": "leaf",
+            "title": "AI 答疑页",
+            "htmlSrc": "pages/qa.html",
+            "status": "generated",
+            "dependencies": []
+          },
+          {
+            "nodeId": "page-search",
+            "nodeType": "leaf",
+            "title": "搜索结果页",
+            "htmlSrc": "pages/search.html",
+            "status": "generated",
+            "dependencies": []
+          },
+          {
+            "nodeId": "page-profile",
+            "nodeType": "leaf",
+            "title": "个人主页",
+            "htmlSrc": "pages/profile.html",
+            "status": "generated",
+            "dependencies": []
+          }
+        ]
+      }
+    },
+    "sharedProjectShellContract": {
+      "navigationShell": "desktop-top-nav",
+      "containerMaxWidth": "1024px",
+      "pagePadding": "24px",
+      "surfaceDepthModel": "static surfaces use border or subtle surface layering; only modals/dropdowns use shadow-2/3",
+      "radiusScale": {
+        "sm": "4px",
+        "md": "8px",
+        "lg": "12px",
+        "xl": "16px"
+      },
+      "typographySystem": {
+        "title": "Inter + Noto Sans SC / PingFang SC",
+        "body": "Inter + Noto Sans SC / PingFang SC",
+        "mono": "JetBrains Mono"
+      },
+      "primaryColor": "af-gray-950 in light / af-gray-0 in dark",
+      "ctaStyle": "filled primary with high contrast; secondary as ghost/bordered",
+      "continuityAnchors": [
+        "top navigation with logo, search, create button, and user avatar",
+        "neutral gray palette with single near-black primary",
+        "8pt spacing grid and restrained 4/8/12/16px radius scale",
+        "Lucide icon system at 20px for UI actions",
+        "centered max-width content container"
+      ]
+    },
+    "deferredPages": [
+      {
+        "nodeId": "page-notice",
+        "title": "通知中心",
+        "reason": "secondary user page beyond 7-page cap"
+      },
+      {
+        "nodeId": "page-login",
+        "title": "登录注册页",
+        "reason": "secondary auth page beyond 7-page cap"
+      },
+      {
+        "nodeId": "page-admin",
+        "title": "后台总览",
+        "reason": "admin backend deferred to second phase"
+      },
+      {
+        "nodeId": "page-review",
+        "title": "内容审核",
+        "reason": "admin backend deferred to second phase"
+      },
+      {
+        "nodeId": "page-user-mgmt",
+        "title": "用户管理",
+        "reason": "admin backend deferred to second phase"
+      },
+      {
+        "nodeId": "page-board-mgmt",
+        "title": "版块管理",
+        "reason": "admin backend deferred to second phase"
+      },
+      {
+        "nodeId": "page-report",
+        "title": "举报处理",
+        "reason": "admin backend deferred to second phase"
+      },
+      {
+        "nodeId": "page-config",
+        "title": "运营配置",
+        "reason": "admin backend deferred to second phase"
+      }
+    ],
+    "cssPreflightEvidence": {
+      "command": "node c:/Users/空间几何/.trae-cn/builtin/design/default/skills/solo-design/shared-runtime/deterministic-tooling/apply-html-head-contract.mjs c:/Users/空间几何/Desktop/zhuzirui/ai-forum-prototype/colors_and_type.css c:/Users/空间几何/Desktop/zhuzirui/ai-forum-prototype/.preflight/preflight.html --title=Preflight --lang=zh-CN --prefix=af",
+      "exitCode": 0,
+      "preflightHtmlPath": "c:/Users/空间几何/Desktop/zhuzirui/ai-forum-prototype/.preflight/preflight.html",
+      "checks": {
+        "themeVarsPresent": true,
+        "themeInlinePresent": true,
+        "semanticTokenFallbackPresent": true,
+        "tailwindCdnPresent": true,
+        "lucideCdnPresent": true,
+        "htmlClassLight": true
+      }
+    },
+    "repairEntryEvidence": [
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "738dde25c1a4fd8e689ad2c9ac3731ea0ce1dbd9c7e4187c9ac522faccd0fa2c",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-11T08:26:50.447Z",
+        "ledgerIndex": 0,
+        "ownerTriageCount": 2,
+        "repairActionCount": 0,
+        "revalidationReportPath": null,
+        "revalidationReportHash": null,
+        "revalidationSuccess": null
+      },
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "ac1c64e036a9200366433cf1307c55da00243cf7d878822e6baab263fc295acd",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-11T08:44:53.266Z",
+        "ledgerIndex": 1,
+        "ownerTriageCount": 8,
+        "repairActionCount": 1,
+        "revalidationReportPath": "validation-report.json",
+        "revalidationReportHash": "c92bc29fa4af00db692b4f06ff88828cee4d82e45ca391c002ecd6674781f22d",
+        "revalidationSuccess": true
+      }
+    ]
+  },
+  "designSource": {
+    "operatingMode": "free-explore",
+    "cssFilePath": "colors_and_type.css",
+    "brandPrefix": "af",
+    "styleConstraints": {
+      "radiusMax": "16px",
+      "staticShadowAlphaMax": 0.05,
+      "singleBrandHue": true,
+      "avoidSecondaryAccent": true,
+      "defaultIconSource": "lucide",
+      "emojiAsIconExplicitOnly": true
+    }
+  },
+  "pages": [
+    {
+      "nodeId": "page-index",
+      "title": "首页",
+      "htmlSrc": "pages/index.html",
+      "pageType": "information-dense",
+      "pageIndex": 1,
+      "visualNorthStar": "Content-discovery hub: clean feed, subtle topic pills, visible AI-assisted recommendations, and a clear conversion path to create/ask/search.",
+      "compositionPattern": "editorial-list-with-sidebar",
+      "continuityAnchors": [
+        "shared top nav",
+        "neutral card surfaces with border",
+        "single dark primary CTA",
+        "Lucide 20px action icons"
+      ],
+      "requirements": [
+        "顶部导航栏（Logo、搜索、提问、发帖、通知、头像）",
+        "推荐内容流（帖子卡片列表）",
+        "热门话题区",
+        "版块快捷入口",
+        "AI 推荐位标识",
+        "未登录浏览提示占位"
+      ],
+      "qualityRisks": [
+        "density",
+        "cjk-long-title"
+      ]
+    },
+    {
+      "nodeId": "page-boards",
+      "title": "版块列表页",
+      "htmlSrc": "pages/boards.html",
+      "pageType": "information-dense",
+      "pageIndex": 2,
+      "visualNorthStar": "Board directory: scannable board grid, topic/tag filters, and a sorted post list that respects the selected board.",
+      "compositionPattern": "filterable-list",
+      "continuityAnchors": [
+        "shared top nav",
+        "neutral card surfaces with border",
+        "tab/filter bar with active state",
+        "Lucide 20px action icons"
+      ],
+      "requirements": [
+        "版块导航/面包屑",
+        "话题/标签筛选器",
+        "帖子列表（标题、摘要、作者、数据）",
+        "排序控件（最新/热门/优质）"
+      ],
+      "qualityRisks": [
+        "density",
+        "table-like-list"
+      ]
+    },
+    {
+      "nodeId": "page-post",
+      "title": "帖子详情页",
+      "htmlSrc": "pages/post.html",
+      "pageType": "information-dense",
+      "pageIndex": 3,
+      "visualNorthStar": "Reading and discussion surface: prominent post body, nested comments, AI discussion summary panel, and related recommendations without visual noise.",
+      "compositionPattern": "article-with-comments",
+      "continuityAnchors": [
+        "shared top nav",
+        "neutral card surfaces with border",
+        "single dark primary CTA",
+        "Lucide 20px action icons"
+      ],
+      "requirements": [
+        "帖子正文区（标题、作者、时间、标签、内容）",
+        "互动工具栏（点赞/收藏/分享/举报）",
+        "评论区（楼中楼结构）",
+        "AI 讨论总结卡片",
+        "相关推荐"
+      ],
+      "qualityRisks": [
+        "density",
+        "nested-comment-depth"
+      ]
+    },
+    {
+      "nodeId": "page-editor",
+      "title": "发帖编辑页",
+      "htmlSrc": "pages/editor.html",
+      "pageType": "task-driven",
+      "pageIndex": 4,
+      "visualNorthStar": "Focused creation workspace: large editor, AI assistant sidebar, tag/board selectors, and a sticky publish bar that keeps the user in flow.",
+      "compositionPattern": "sticky-two-column",
+      "continuityAnchors": [
+        "shared top nav",
+        "neutral input surfaces",
+        "single dark primary CTA",
+        "Lucide 20px action icons"
+      ],
+      "requirements": [
+        "内容编辑器（标题、正文输入）",
+        "AI 发帖助手面板（标题建议、标签建议、版块建议、敏感提醒）",
+        "标签与版块选择器",
+        "预览与发布栏"
+      ],
+      "qualityRisks": [
+        "form-density",
+        "task-focus"
+      ]
+    },
+    {
+      "nodeId": "page-qa",
+      "title": "AI 答疑页",
+      "htmlSrc": "pages/qa.html",
+      "pageType": "task-driven",
+      "pageIndex": 5,
+      "visualNorthStar": "Question-to-answer interface: clear input, streaming-answer-like AI response card with source citations, and a community supplement area.",
+      "compositionPattern": "question-answer-stream",
+      "continuityAnchors": [
+        "shared top nav",
+        "neutral card surfaces with border",
+        "single dark primary CTA",
+        "Lucide 20px action icons"
+      ],
+      "requirements": [
+        "提问输入框",
+        "AI 回答区（含来源引用卡片）",
+        "风险提示标签",
+        "社区补充回答区",
+        "相关问题推荐"
+      ],
+      "qualityRisks": [
+        "task-focus",
+        "citation-density"
+      ]
+    },
+    {
+      "nodeId": "page-search",
+      "title": "搜索结果页",
+      "htmlSrc": "pages/search.html",
+      "pageType": "information-dense",
+      "pageIndex": 6,
+      "visualNorthStar": "Search results surface: persistent search bar, category tabs, AI aggregate summary at top, and grouped result cards.",
+      "compositionPattern": "search-with-filters",
+      "continuityAnchors": [
+        "shared top nav",
+        "neutral card surfaces with border",
+        "tab/filter bar with active state",
+        "Lucide 20px action icons"
+      ],
+      "requirements": [
+        "搜索栏（带历史/推荐）",
+        "分类筛选（帖子/用户/知识库）",
+        "AI 结果聚合摘要",
+        "搜索结果列表"
+      ],
+      "qualityRisks": [
+        "density",
+        "filter-crowding"
+      ]
+    },
+    {
+      "nodeId": "page-profile",
+      "title": "个人主页",
+      "htmlSrc": "pages/profile.html",
+      "pageType": "information-dense",
+      "pageIndex": 7,
+      "visualNorthStar": "Identity and content portfolio: profile card with influence metrics, tabbed content lists, and follow/follower counts.",
+      "compositionPattern": "profile-with-tabs",
+      "continuityAnchors": [
+        "shared top nav",
+        "neutral card surfaces with border",
+        "single dark primary CTA",
+        "Lucide 20px action icons"
+      ],
+      "requirements": [
+        "用户资料卡（头像、昵称、简介、数据）",
+        "内容列表标签（发帖/收藏/关注）",
+        "关注与粉丝数",
+        "社区影响力指标"
+      ],
+      "qualityRisks": [
+        "density",
+        "metric-card-crowding"
+      ]
+    }
+  ],
+  "assets": [],
+  "wiringPlan": [
+    {
+      "wiringId": "w-nav-shell",
+      "description": "共享顶部导航壳：Logo 返回首页，搜索进入搜索页，提问进入 AI 答疑，发布进入编辑器，头像/个人入口进入个人主页。",
+      "scope": "all-pages",
+      "triggers": [
+        "nav-logo",
+        "nav-search",
+        "nav-ask",
+        "nav-create",
+        "nav-profile"
+      ],
+      "targetPages": [
+        "page-index",
+        "page-search",
+        "page-qa",
+        "page-editor",
+        "page-profile"
+      ]
+    },
+    {
+      "wiringId": "w-content-to-post",
+      "description": "内容卡片/标题点击进入帖子详情页。",
+      "scope": "index,boards,search,profile,qa",
+      "triggers": [
+        "feed-post-*",
+        "board-post-*",
+        "search-post-*",
+        "profile-post-*",
+        "source-card-*",
+        "related-question-*"
+      ],
+      "targetPages": [
+        "page-post"
+      ]
+    },
+    {
+      "wiringId": "w-user-to-profile",
+      "description": "作者/用户头像或昵称点击进入个人主页。",
+      "scope": "post,search,qa,profile",
+      "triggers": [
+        "post-author",
+        "search-user-*",
+        "community-answer-author-*",
+        "following-user-*",
+        "follower-user-*"
+      ],
+      "targetPages": [
+        "page-profile"
+      ]
+    },
+    {
+      "wiringId": "w-sidebar-discovery",
+      "description": "首页侧边栏话题标签进入搜索页，版块快捷入口进入版块列表页。",
+      "scope": "index",
+      "triggers": [
+        "sidebar-topic-*",
+        "sidebar-board-*"
+      ],
+      "targetPages": [
+        "page-search",
+        "page-boards"
+      ]
+    },
+    {
+      "wiringId": "w-publish",
+      "description": "编辑器发布按钮提交后进入帖子详情页。",
+      "scope": "editor",
+      "triggers": [
+        "publish-btn"
+      ],
+      "targetPages": [
+        "page-post"
+      ]
+    }
+  ],
+  "hiddenInteractionPlan": [
+    {
+      "interactionId": "hi-guest-timer",
+      "description": "未登录用户首页浏览 5 分钟后触发认证入口弹层，引导登录/注册。",
+      "scope": "page-index",
+      "trigger": {
+        "type": "timer",
+        "delaySeconds": 300,
+        "condition": "unauthenticated"
+      },
+      "action": {
+        "type": "showModal",
+        "targetDomId": "auth-entry-modal"
+      }
+    },
+    {
+      "interactionId": "hi-guest-block-create",
+      "description": "未登录用户点击发布按钮时重定向到登录/注册页。",
+      "scope": "all-pages",
+      "trigger": {
+        "type": "click",
+        "condition": "unauthenticated"
+      },
+      "action": {
+        "type": "navigate",
+        "target": "login-register"
+      }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "root": {
+    "nodeId": "root",
+    "nodeType": "root",
+    "title": "AI 辅助论坛原型",
+    "status": "generated",
+    "children": [
+      {
+        "nodeId": "page-index",
+        "nodeType": "leaf",
+        "title": "首页",
+        "htmlSrc": "pages/index.html",
+        "status": "generated",
+        "dependencies": []
+      },
+      {
+        "nodeId": "page-boards",
+        "nodeType": "leaf",
+        "title": "版块列表页",
+        "htmlSrc": "pages/boards.html",
+        "status": "generated",
+        "dependencies": []
+      },
+      {
+        "nodeId": "page-post",
+        "nodeType": "leaf",
+        "title": "帖子详情页",
+        "htmlSrc": "pages/post.html",
+        "status": "generated",
+        "dependencies": []
+      },
+      {
+        "nodeId": "page-editor",
+        "nodeType": "leaf",
+        "title": "发帖编辑页",
+        "htmlSrc": "pages/editor.html",
+        "status": "generated",
+        "dependencies": []
+      },
+      {
+        "nodeId": "page-qa",
+        "nodeType": "leaf",
+        "title": "AI 答疑页",
+        "htmlSrc": "pages/qa.html",
+        "status": "generated",
+        "dependencies": []
+      },
+      {
+        "nodeId": "page-search",
+        "nodeType": "leaf",
+        "title": "搜索结果页",
+        "htmlSrc": "pages/search.html",
+        "status": "generated",
+        "dependencies": []
+      },
+      {
+        "nodeId": "page-profile",
+        "nodeType": "leaf",
+        "title": "个人主页",
+        "htmlSrc": "pages/profile.html",
+        "status": "generated",
+        "dependencies": []
+      }
+    ]
+  }
+}

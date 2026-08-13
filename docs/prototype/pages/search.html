@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>搜索结果页</title>
+    <style id="theme-vars">
+/* AI 辅助论坛原型 —— 现代极简设计系统 */
+
+:root {
+  /* === 品牌主色：深蓝灰，克制而有力 === */
+  --af-brand-50: #f8fafc;
+  --af-brand-100: #f1f5f9;
+  --af-brand-200: #e2e8f0;
+  --af-brand-300: #cbd5e1;
+  --af-brand-400: #94a3b8;
+  --af-brand-500: #64748b;
+  --af-brand-600: #475569;
+  --af-brand-700: #334155;
+  --af-brand-800: #1e293b;
+  --af-brand-900: #0f172a;
+
+  /* === 中性灰阶 === */
+  --af-gray-0: #ffffff;
+  --af-gray-50: #fafafa;
+  --af-gray-100: #f5f5f5;
+  --af-gray-200: #e5e5e5;
+  --af-gray-300: #d4d4d4;
+  --af-gray-400: #a3a3a3;
+  --af-gray-500: #737373;
+  --af-gray-600: #525252;
+  --af-gray-700: #404040;
+  --af-gray-800: #262626;
+  --af-gray-900: #171717;
+  --af-gray-950: #0a0a0a;
+
+  /* === 语义 Token（Light Mode） === */
+  --af-background: var(--af-gray-50);
+  --af-foreground: var(--af-gray-950);
+  --af-card: var(--af-gray-0);
+  --af-card-foreground: var(--af-gray-950);
+  --af-popover: var(--af-gray-0);
+  --af-popover-foreground: var(--af-gray-950);
+  --af-primary: var(--af-gray-950);
+  --af-primary-foreground: var(--af-gray-0);
+  --af-secondary: var(--af-gray-100);
+  --af-secondary-foreground: var(--af-gray-900);
+  --af-muted: var(--af-gray-100);
+  --af-muted-foreground: var(--af-gray-500);
+  --af-border: var(--af-gray-200);
+  --af-input: var(--af-gray-200);
+  --af-ring: var(--af-gray-950);
+  --af-radius-small: 4px;
+  --af-radius-medium: 8px;
+  --af-radius-large: 12px;
+  --af-radius-xlarge: 16px;
+
+  /* === 状态色（仅用于状态/验证/操作反馈） === */
+  --af-state-success: #16a34a;
+  --af-state-success-bg: #f0fdf4;
+  --af-state-warning: #ca8a04;
+  --af-state-warning-bg: #fefce8;
+  --af-state-error: #dc2626;
+  --af-state-error-bg: #fef2f2;
+  --af-state-info: #2563eb;
+  --af-state-info-bg: #eff6ff;
+
+  /* === 表面与阴影 === */
+  --af-surface: var(--af-gray-0);
+  --af-surface-2: var(--af-gray-100);
+  --af-ink: var(--af-gray-950);
+  --af-ink-2: var(--af-gray-600);
+  --af-ink-3: var(--af-gray-400);
+  --af-line: var(--af-gray-200);
+  --af-brand: var(--af-gray-950);
+  --af-brand-ink: var(--af-gray-0);
+
+  --af-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --af-shadow-2: 0 8px 24px -8px rgba(15, 23, 42, 0.14);
+  --af-shadow-3: 0 24px 60px -20px rgba(15, 23, 42, 0.24);
+
+  /* === 字体系统 === */
+  --af-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --af-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* === 间距系统（8pt 网格） === */
+  --af-space-1: 4px;
+  --af-space-2: 8px;
+  --af-space-3: 12px;
+  --af-space-4: 16px;
+  --af-space-5: 24px;
+  --af-space-6: 32px;
+  --af-space-7: 48px;
+  --af-space-8: 64px;
+  --af-space-9: 96px;
+}
+
+/* === Dark Mode（通过父级 class 切换） === */
+.dark {
+  --af-background: var(--af-gray-950);
+  --af-foreground: var(--af-gray-50);
+  --af-card: var(--af-gray-900);
+  --af-card-foreground: var(--af-gray-50);
+  --af-popover: var(--af-gray-900);
+  --af-popover-foreground: var(--af-gray-50);
+  --af-primary: var(--af-gray-0);
+  --af-primary-foreground: var(--af-gray-950);
+  --af-secondary: var(--af-gray-800);
+  --af-secondary-foreground: var(--af-gray-100);
+  --af-muted: var(--af-gray-800);
+  --af-muted-foreground: var(--af-gray-400);
+  --af-border: var(--af-gray-800);
+  --af-input: var(--af-gray-800);
+  --af-ring: var(--af-gray-100);
+
+  --af-surface: var(--af-gray-900);
+  --af-surface-2: var(--af-gray-800);
+  --af-ink: var(--af-gray-50);
+  --af-ink-2: var(--af-gray-400);
+  --af-ink-3: var(--af-gray-600);
+  --af-line: var(--af-gray-800);
+  --af-brand: var(--af-gray-0);
+  --af-brand-ink: var(--af-gray-950);
+
+  --af-state-success: #22c55e;
+  --af-state-success-bg: rgba(34, 197, 94, 0.12);
+  --af-state-warning: #eab308;
+  --af-state-warning-bg: rgba(234, 179, 8, 0.12);
+  --af-state-error: #ef4444;
+  --af-state-error-bg: rgba(239, 68, 68, 0.12);
+  --af-state-info: #3b82f6;
+  --af-state-info-bg: rgba(59, 130, 246, 0.12);
+
+  --af-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.16);
+  --af-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  --af-shadow-3: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* === 基础排版工具类 === */
+.font-sans { font-family: var(--af-font-sans); }
+.font-mono { font-family: var(--af-font-mono); }
+
+/* === 滚动条极简样式 === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--af-gray-300); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: var(--af-gray-700); }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--af-background);
+    --color-foreground: var(--af-foreground);
+    --color-card: var(--af-card);
+    --color-card-foreground: var(--af-card-foreground);
+    --color-popover: var(--af-popover);
+    --color-popover-foreground: var(--af-popover-foreground);
+    --color-primary: var(--af-primary);
+    --color-primary-foreground: var(--af-primary-foreground);
+    --color-secondary: var(--af-secondary);
+    --color-secondary-foreground: var(--af-secondary-foreground);
+    --color-muted: var(--af-muted);
+    --color-muted-foreground: var(--af-muted-foreground);
+    --color-border: var(--af-border);
+    --color-input: var(--af-input);
+    --color-ring: var(--af-ring);
+    --radius-sm: var(--af-radius-small);
+    --radius-md: var(--af-radius-medium);
+    --radius-lg: var(--af-radius-large);
+    --radius-xl: var(--af-radius-xlarge);
+  }
+  @layer base {
+    body { background: var(--af-background); color: var(--af-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--af-background); }
+      .text-background { color: var(--af-background); }
+      .border-background { border-color: var(--af-background); }
+      .ring-background { --tw-ring-color: var(--af-background); }
+      .bg-foreground { background-color: var(--af-foreground); }
+      .text-foreground { color: var(--af-foreground); }
+      .border-foreground { border-color: var(--af-foreground); }
+      .ring-foreground { --tw-ring-color: var(--af-foreground); }
+      .bg-card { background-color: var(--af-card); }
+      .text-card { color: var(--af-card); }
+      .border-card { border-color: var(--af-card); }
+      .ring-card { --tw-ring-color: var(--af-card); }
+      .bg-card-foreground { background-color: var(--af-card-foreground); }
+      .text-card-foreground { color: var(--af-card-foreground); }
+      .border-card-foreground { border-color: var(--af-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--af-card-foreground); }
+      .bg-popover { background-color: var(--af-popover); }
+      .text-popover { color: var(--af-popover); }
+      .border-popover { border-color: var(--af-popover); }
+      .ring-popover { --tw-ring-color: var(--af-popover); }
+      .bg-popover-foreground { background-color: var(--af-popover-foreground); }
+      .text-popover-foreground { color: var(--af-popover-foreground); }
+      .border-popover-foreground { border-color: var(--af-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--af-popover-foreground); }
+      .bg-primary { background-color: var(--af-primary); }
+      .text-primary { color: var(--af-primary); }
+      .border-primary { border-color: var(--af-primary); }
+      .ring-primary { --tw-ring-color: var(--af-primary); }
+      .bg-primary-foreground { background-color: var(--af-primary-foreground); }
+      .text-primary-foreground { color: var(--af-primary-foreground); }
+      .border-primary-foreground { border-color: var(--af-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--af-primary-foreground); }
+      .bg-secondary { background-color: var(--af-secondary); }
+      .text-secondary { color: var(--af-secondary); }
+      .border-secondary { border-color: var(--af-secondary); }
+      .ring-secondary { --tw-ring-color: var(--af-secondary); }
+      .bg-secondary-foreground { background-color: var(--af-secondary-foreground); }
+      .text-secondary-foreground { color: var(--af-secondary-foreground); }
+      .border-secondary-foreground { border-color: var(--af-secondary-foreground); }
+      .ring-secondary-foreground { --tw-ring-color: var(--af-secondary-foreground); }
+      .bg-muted { background-color: var(--af-muted); }
+      .text-muted { color: var(--af-muted); }
+      .border-muted { border-color: var(--af-muted); }
+      .ring-muted { --tw-ring-color: var(--af-muted); }
+      .bg-muted-foreground { background-color: var(--af-muted-foreground); }
+      .text-muted-foreground { color: var(--af-muted-foreground); }
+      .border-muted-foreground { border-color: var(--af-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--af-muted-foreground); }
+      .bg-border { background-color: var(--af-border); }
+      .text-border { color: var(--af-border); }
+      .border-border { border-color: var(--af-border); }
+      .ring-border { --tw-ring-color: var(--af-border); }
+      .bg-input { background-color: var(--af-input); }
+      .text-input { color: var(--af-input); }
+      .border-input { border-color: var(--af-input); }
+      .ring-input { --tw-ring-color: var(--af-input); }
+      .bg-ring { background-color: var(--af-ring); }
+      .text-ring { color: var(--af-ring); }
+      .border-ring { border-color: var(--af-ring); }
+      .ring-ring { --tw-ring-color: var(--af-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <!-- 顶部导航栏：与首页一致的共享导航 -->
+    <header class="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" data-dom-id="nav-header">
+        <div class="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+            <a href="./index.html" class="flex items-center gap-2 text-lg font-semibold tracking-tight" data-dom-id="nav-logo">
+                <span class="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                    <i data-lucide="message-square" class="h-4 w-4"></i>
+                </span>
+                <span>AI Forum</span>
+            </a>
+            <nav class="hidden items-center gap-1 md:flex">
+                <a href="./index.html" class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">首页</a>
+                <a href="./qa.html" class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-dom-id="nav-ask">
+                    <i data-lucide="help-circle" class="h-4 w-4"></i>
+                    问答
+                </a>
+                <a href="./editor.html" class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-dom-id="nav-create">
+                    <i data-lucide="plus-square" class="h-4 w-4"></i>
+                    发布
+                </a>
+            </nav>
+            <div class="flex items-center gap-3">
+                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden" aria-label="菜单">
+                    <i data-lucide="menu" class="h-4 w-4"></i>
+                </button>
+                <a href="./profile.html" class="flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 text-sm font-medium transition-colors hover:bg-muted" data-dom-id="nav-profile">
+                    <div class="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-foreground" aria-hidden="true">我</div>
+                    <span class="hidden sm:inline">我的</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="mx-auto min-h-[calc(100vh-3.5rem)] w-full max-w-7xl px-4 pb-16 pt-6 sm:px-6 lg:px-8" id="page-search">
+        <!-- 搜索栏区域 -->
+        <section class="mb-6" aria-label="搜索">
+            <form class="relative mx-auto flex w-full max-w-3xl flex-col gap-3" role="search" action="./search.html" method="get">
+                <div class="relative flex items-center">
+                    <div class="pointer-events-none absolute left-3 text-muted-foreground">
+                        <i data-lucide="search" class="h-5 w-5"></i>
+                    </div>
+                    <input
+                        type="search"
+                        name="q"
+                        value="租房押金"
+                        placeholder="搜索问题、帖子、用户或知识库…"
+                        class="h-14 w-full rounded-xl border border-input bg-card pl-11 pr-28 text-base text-foreground shadow-sm outline-none ring-offset-background transition-all placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+                        aria-label="搜索关键词"
+                    />
+                    <div class="absolute right-2 flex items-center gap-2">
+                        <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="清除">
+                            <i data-lucide="x" class="h-4 w-4"></i>
+                        </button>
+                        <button type="submit" class="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                            搜索
+                        </button>
+                    </div>
+                </div>
+                <!-- 搜索历史/推荐 -->
+                <div class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="clock" class="h-3.5 w-3.5"></i>
+                        历史：
+                    </span>
+                    <a href="./search.html?q=劳动合同" class="rounded-full border border-border px-2.5 py-1 transition-colors hover:bg-muted">劳动合同</a>
+                    <a href="./search.html?q=租房押金" class="rounded-full border border-border px-2.5 py-1 transition-colors hover:bg-muted">租房押金</a>
+                    <a href="./search.html?q=加班工资" class="rounded-full border border-border px-2.5 py-1 transition-colors hover:bg-muted">加班工资</a>
+                    <span class="mx-1 hidden sm:inline">·</span>
+                    <span class="hidden items-center gap-1 sm:flex">
+                        <i data-lucide="trending-up" class="h-3.5 w-3.5"></i>
+                        推荐：
+                    </span>
+                    <a href="./search.html?q=消费者权益" class="rounded-full border border-border px-2.5 py-1 transition-colors hover:bg-muted">消费者权益</a>
+                    <a href="./search.html?q=隐私政策" class="rounded-full border border-border px-2.5 py-1 transition-colors hover:bg-muted">隐私政策</a>
+                </div>
+            </form>
+        </section>
+
+        <!-- 筛选与排序控件 -->
+        <section class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between" aria-label="筛选与排序">
+            <!-- 分类筛选标签 -->
+            <div class="inline-flex w-full overflow-x-auto no-scrollbar rounded-lg border border-border bg-card p-1 sm:w-auto" role="tablist" aria-label="结果分类">
+                <button type="button" role="tab" aria-selected="true" class="tab-active inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors sm:flex-none" data-dom-id="tab-posts">
+                    <i data-lucide="file-text" class="h-4 w-4"></i>
+                    帖子
+                    <span class="rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">128</span>
+                </button>
+                <button type="button" role="tab" aria-selected="false" class="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex-none" data-dom-id="tab-users">
+                    <i data-lucide="users" class="h-4 w-4"></i>
+                    用户
+                    <span class="rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">14</span>
+                </button>
+                <button type="button" role="tab" aria-selected="false" class="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex-none" data-dom-id="tab-kb">
+                    <i data-lucide="book-open" class="h-4 w-4"></i>
+                    知识库
+                    <span class="rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">9</span>
+                </button>
+            </div>
+
+            <!-- 排序与时间筛选 -->
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-muted-foreground" for="sort-select">排序</label>
+                <select id="sort-select" class="h-9 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20">
+                    <option value="relevance">相关度</option>
+                    <option value="latest">最新</option>
+                    <option value="hot">热门</option>
+                </select>
+                <label class="sr-only" for="time-select">时间范围</label>
+                <select id="time-select" class="h-9 rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20">
+                    <option value="all">全部时间</option>
+                    <option value="day">24 小时内</option>
+                    <option value="week">一周内</option>
+                    <option value="month">一月内</option>
+                    <option value="year">一年内</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- AI 结果聚合摘要卡片 -->
+        <section class="mb-6" aria-label="AI 搜索摘要">
+            <div class="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div class="mb-3 flex items-center gap-2">
+                    <span class="inline-flex h-6 items-center gap-1 rounded-md bg-foreground px-2 text-xs font-medium text-background">
+                        <i data-lucide="sparkles" class="h-3 w-3"></i>
+                        AI 聚合摘要
+                    </span>
+                    <span class="text-xs text-muted-foreground">基于 151 条结果生成</span>
+                </div>
+                <h2 class="mb-2 text-lg font-semibold text-foreground">关于“租房押金”，社区有这些共识与建议</h2>
+                <div class="space-y-2 text-sm leading-relaxed text-muted-foreground">
+                    <p>租房押金纠纷是最常见的租房问题之一。多数社区讨论集中在：押金退还条件、房屋损坏责任界定、提前退租扣款比例以及中介/二房东挪用押金。</p>
+                    <ul class="ml-5 list-disc space-y-1">
+                        <li><strong class="font-medium text-foreground">退还时间：</strong>合同终止且房屋交接完成后，房东通常应在 7–15 个工作日内退还押金。</li>
+                        <li><strong class="font-medium text-foreground">扣款依据：</strong>需有明确的物品清单、入住前后对比照片及维修报价，不能随意扣款。</li>
+                        <li><strong class="font-medium text-foreground">维权路径：</strong>协商 → 居委会/物业调解 → 12345/住建委投诉 → 人民调解/小额诉讼。</li>
+                    </ul>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                    <span class="text-xs text-muted-foreground">相关标签：</span>
+                    <a href="./search.html?q=租赁合同" class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-muted/80">租赁合同</a>
+                    <a href="./search.html?q=退房清单" class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-muted/80">退房清单</a>
+                    <a href="./search.html?q=押金退还" class="rounded-md bg-muted px-2 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-muted/80">押金退还</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- 搜索结果列表 -->
+        <section class="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_18rem]" aria-label="搜索结果">
+            <div class="space-y-4">
+                <!-- 帖子结果 -->
+                <article class="group rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-sm" data-dom-id="search-result-post-1">
+                    <a href="./post.html" class="block">
+                        <h3 class="mb-2 text-base font-semibold text-foreground transition-colors group-hover:text-primary">租房押金被扣了 1500，房东说墙面有污渍，我该怎么办？</h3>
+                        <p class="mb-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">退房时房东以墙面有“不明污渍”为由扣了 1500 元押金。入住时并未拍照留存，只有中介当时在场的口头确认。请问这种情况如何举证和协商？</p>
+                    </a>
+                    <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <a href="./profile.html" class="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline">
+                            <span class="h-5 w-5 rounded-full bg-muted"></span>
+                            租房小助手
+                        </a>
+                        <span class="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-secondary-foreground">
+                            <i data-lucide="layout-grid" class="h-3 w-3"></i>
+                            租房维权
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="clock" class="h-3 w-3"></i>
+                            3 小时前
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="message-circle" class="h-3 w-3"></i>
+                            24 回复
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="thumbs-up" class="h-3 w-3"></i>
+                            56 赞
+                        </span>
+                    </div>
+                </article>
+
+                <article class="group rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-sm" data-dom-id="search-result-post-2">
+                    <a href="./post.html" class="block">
+                        <h3 class="mb-2 text-base font-semibold text-foreground transition-colors group-hover:text-primary">实习租房被中介收了“服务费”，这合法吗？</h3>
+                        <p class="mb-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">签合同时中介要求一次性支付一个月租金作为服务费，但没有提供任何额外服务。合同里也没有明确约定，能否要求退还？</p>
+                    </a>
+                    <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <a href="./profile.html" class="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline">
+                            <span class="h-5 w-5 rounded-full bg-muted"></span>
+                            法律萌新
+                        </a>
+                        <span class="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-secondary-foreground">
+                            <i data-lucide="layout-grid" class="h-3 w-3"></i>
+                            租房维权
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="clock" class="h-3 w-3"></i>
+                            昨天
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="message-circle" class="h-3 w-3"></i>
+                            18 回复
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="thumbs-up" class="h-3 w-3"></i>
+                            42 赞
+                        </span>
+                    </div>
+                </article>
+
+                <article class="group rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-sm" data-dom-id="search-result-post-3">
+                    <a href="./post.html" class="block">
+                        <h3 class="mb-2 text-base font-semibold text-foreground transition-colors group-hover:text-primary">整理了一份《租房押金退还 checklist》，需要自取</h3>
+                        <p class="mb-3 line-clamp-2 text-sm leading-relaxed text-muted-foreground">结合自己两次退租经历，整理了入住/退房拍照清单、合同关键条款、沟通留痕模板。希望对大家有帮助，欢迎补充。</p>
+                    </a>
+                    <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <a href="./profile.html" class="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline">
+                            <span class="h-5 w-5 rounded-full bg-muted"></span>
+                            经验分享君
+                        </a>
+                        <span class="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-secondary-foreground">
+                            <i data-lucide="layout-grid" class="h-3 w-3"></i>
+                            经验分享
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="clock" class="h-3 w-3"></i>
+                            2 天前
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="message-circle" class="h-3 w-3"></i>
+                            31 回复
+                        </span>
+                        <span class="inline-flex items-center gap-1">
+                            <i data-lucide="thumbs-up" class="h-3 w-3"></i>
+                            89 赞
+                        </span>
+                    </div>
+                </article>
+
+                <!-- 用户结果 -->
+                <div class="rounded-xl border border-border bg-card p-5" data-dom-id="search-result-user-1">
+                    <div class="flex items-start justify-between gap-4">
+                        <a href="./profile.html" class="flex items-center gap-3">
+                            <span class="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">律</span>
+                            <div>
+                                <h4 class="text-base font-semibold text-foreground">律师老张</h4>
+                                <p class="text-sm text-muted-foreground">民商事律师 · 专注租赁与劳动争议 · 已帮助 2,300+ 人</p>
+                            </div>
+                        </a>
+                        <button type="button" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+                            <i data-lucide="plus" class="h-3.5 w-3.5"></i>
+                            关注
+                        </button>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">租房维权</span>
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">劳动法</span>
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">合同审查</span>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-border bg-card p-5" data-dom-id="search-result-user-2">
+                    <div class="flex items-start justify-between gap-4">
+                        <a href="./profile.html" class="flex items-center gap-3">
+                            <span class="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">租</span>
+                            <div>
+                                <h4 class="text-base font-semibold text-foreground">租房避坑指南</h4>
+                                <p class="text-sm text-muted-foreground">资深租房顾问 · 发布 150+ 篇租房干货 · 粉丝 1.2 万</p>
+                            </div>
+                        </a>
+                        <button type="button" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+                            <i data-lucide="plus" class="h-3.5 w-3.5"></i>
+                            关注
+                        </button>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">租房攻略</span>
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">押金退还</span>
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">中介识别</span>
+                    </div>
+                </div>
+
+                <!-- 知识库结果 -->
+                <article class="group rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-sm" data-dom-id="search-result-kb-1">
+                    <a href="./post.html" class="block">
+                        <div class="mb-2 flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                                <i data-lucide="book-open" class="h-3 w-3"></i>
+                                知识库
+                            </span>
+                            <span class="text-xs text-muted-foreground">最后更新于 2025-06-12</span>
+                        </div>
+                        <h3 class="mb-2 text-base font-semibold text-foreground transition-colors group-hover:text-primary">租房押金法律实务指南</h3>
+                        <p class="line-clamp-2 text-sm leading-relaxed text-muted-foreground">系统梳理《民法典》合同编与住房租赁相关规范，覆盖押金性质、退还条件、举证责任、常见争议点及诉讼/仲裁要点。</p>
+                    </a>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">民法典</span>
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">租赁合同</span>
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">押金</span>
+                        <span class="rounded-md bg-muted px-2 py-1 text-xs text-secondary-foreground">举证</span>
+                    </div>
+                </article>
+
+                <!-- 分页 -->
+                <nav class="flex items-center justify-center gap-1 pt-4" aria-label="分页">
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="上一页" disabled>
+                        <i data-lucide="chevron-left" class="h-4 w-4"></i>
+                    </button>
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-medium text-primary-foreground" aria-current="page">1</button>
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted">2</button>
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted">3</button>
+                    <span class="px-1 text-muted-foreground">…</span>
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-sm font-medium text-foreground transition-colors hover:bg-muted">12</button>
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="下一页">
+                        <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- 侧边栏：相关推荐 -->
+            <aside class="space-y-6">
+                <div class="rounded-xl border border-border bg-card p-5">
+                    <h4 class="mb-4 text-sm font-semibold text-foreground">相关问题</h4>
+                    <ul class="space-y-3">
+                        <li>
+                            <a href="./search.html?q=押金不退怎么办" class="block text-sm text-muted-foreground transition-colors hover:text-foreground">
+                                <span class="mr-1 text-muted-foreground">·</span>
+                                押金不退怎么办？
+                            </a>
+                        </li>
+                        <li>
+                            <a href="./search.html?q=退房清单怎么写" class="block text-sm text-muted-foreground transition-colors hover:text-foreground">
+                                <span class="mr-1 text-muted-foreground">·</span>
+                                退房清单怎么写？
+                            </a>
+                        </li>
+                        <li>
+                            <a href="./search.html?q=二房东跑路押金" class="block text-sm text-muted-foreground transition-colors hover:text-foreground">
+                                <span class="mr-1 text-muted-foreground">·</span>
+                                二房东跑路，押金能追回吗？
+                            </a>
+                        </li>
+                        <li>
+                            <a href="./search.html?q=房东克扣押金证据" class="block text-sm text-muted-foreground transition-colors hover:text-foreground">
+                                <span class="mr-1 text-muted-foreground">·</span>
+                                房东克扣押金需要哪些证据？
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-border bg-card p-5">
+                    <h4 class="mb-4 text-sm font-semibold text-foreground">热门版块</h4>
+                    <div class="space-y-2">
+                        <a href="./search.html?q=租房维权" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="home" class="h-4 w-4 text-muted-foreground"></i>
+                                租房维权
+                            </span>
+                            <span class="text-xs text-muted-foreground">3.2k 帖</span>
+                        </a>
+                        <a href="./search.html?q=劳动权益" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="briefcase" class="h-4 w-4 text-muted-foreground"></i>
+                                劳动权益
+                            </span>
+                            <span class="text-xs text-muted-foreground">2.8k 帖</span>
+                        </a>
+                        <a href="./search.html?q=消费投诉" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted">
+                            <span class="flex items-center gap-2">
+                                <i data-lucide="credit-card" class="h-4 w-4 text-muted-foreground"></i>
+                                消费投诉
+                            </span>
+                            <span class="text-xs text-muted-foreground">1.5k 帖</span>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="border-t border-border bg-card py-10">
+        <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-sm text-muted-foreground sm:flex-row sm:px-6 lg:px-8">
+            <div class="flex items-center gap-2">
+                <span class="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                    <i data-lucide="message-square" class="h-3 w-3"></i>
+                </span>
+                <span class="font-medium text-foreground">AI Forum</span>
+            </div>
+            <nav class="flex flex-wrap items-center justify-center gap-4">
+                <a href="./index.html" class="transition-colors hover:text-foreground">首页</a>
+                <a href="./qa.html" class="transition-colors hover:text-foreground">问答</a>
+                <a href="./editor.html" class="transition-colors hover:text-foreground">发布</a>
+                <a href="./profile.html" class="transition-colors hover:text-foreground">我的</a>
+            </nav>
+            <p>© 2026 AI Forum. 保留所有权利。</p>
+        </div>
+    </footer>
+
+    <style>
+        /* 分类标签 active 状态，使用设计系统 token */
+        .tab-active {
+            background-color: var(--af-primary);
+            color: var(--af-primary-foreground);
+        }
+        .tab-active .bg-muted {
+            background-color: var(--af-primary-foreground);
+            color: var(--af-primary);
+        }
+    </style>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

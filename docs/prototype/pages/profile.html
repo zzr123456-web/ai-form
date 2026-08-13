@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人主页</title>
+    <style id="theme-vars">
+/* AI 辅助论坛原型 —— 现代极简设计系统 */
+
+:root {
+  /* === 品牌主色：深蓝灰，克制而有力 === */
+  --af-brand-50: #f8fafc;
+  --af-brand-100: #f1f5f9;
+  --af-brand-200: #e2e8f0;
+  --af-brand-300: #cbd5e1;
+  --af-brand-400: #94a3b8;
+  --af-brand-500: #64748b;
+  --af-brand-600: #475569;
+  --af-brand-700: #334155;
+  --af-brand-800: #1e293b;
+  --af-brand-900: #0f172a;
+
+  /* === 中性灰阶 === */
+  --af-gray-0: #ffffff;
+  --af-gray-50: #fafafa;
+  --af-gray-100: #f5f5f5;
+  --af-gray-200: #e5e5e5;
+  --af-gray-300: #d4d4d4;
+  --af-gray-400: #a3a3a3;
+  --af-gray-500: #737373;
+  --af-gray-600: #525252;
+  --af-gray-700: #404040;
+  --af-gray-800: #262626;
+  --af-gray-900: #171717;
+  --af-gray-950: #0a0a0a;
+
+  /* === 语义 Token（Light Mode） === */
+  --af-background: var(--af-gray-50);
+  --af-foreground: var(--af-gray-950);
+  --af-card: var(--af-gray-0);
+  --af-card-foreground: var(--af-gray-950);
+  --af-popover: var(--af-gray-0);
+  --af-popover-foreground: var(--af-gray-950);
+  --af-primary: var(--af-gray-950);
+  --af-primary-foreground: var(--af-gray-0);
+  --af-secondary: var(--af-gray-100);
+  --af-secondary-foreground: var(--af-gray-900);
+  --af-muted: var(--af-gray-100);
+  --af-muted-foreground: var(--af-gray-500);
+  --af-border: var(--af-gray-200);
+  --af-input: var(--af-gray-200);
+  --af-ring: var(--af-gray-950);
+  --af-radius-small: 4px;
+  --af-radius-medium: 8px;
+  --af-radius-large: 12px;
+  --af-radius-xlarge: 16px;
+
+  /* === 状态色（仅用于状态/验证/操作反馈） === */
+  --af-state-success: #16a34a;
+  --af-state-success-bg: #f0fdf4;
+  --af-state-warning: #ca8a04;
+  --af-state-warning-bg: #fefce8;
+  --af-state-error: #dc2626;
+  --af-state-error-bg: #fef2f2;
+  --af-state-info: #2563eb;
+  --af-state-info-bg: #eff6ff;
+
+  /* === 表面与阴影 === */
+  --af-surface: var(--af-gray-0);
+  --af-surface-2: var(--af-gray-100);
+  --af-ink: var(--af-gray-950);
+  --af-ink-2: var(--af-gray-600);
+  --af-ink-3: var(--af-gray-400);
+  --af-line: var(--af-gray-200);
+  --af-brand: var(--af-gray-950);
+  --af-brand-ink: var(--af-gray-0);
+
+  --af-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --af-shadow-2: 0 8px 24px -8px rgba(15, 23, 42, 0.14);
+  --af-shadow-3: 0 24px 60px -20px rgba(15, 23, 42, 0.24);
+
+  /* === 字体系统 === */
+  --af-font-sans: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --af-font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+  /* === 间距系统（8pt 网格） === */
+  --af-space-1: 4px;
+  --af-space-2: 8px;
+  --af-space-3: 12px;
+  --af-space-4: 16px;
+  --af-space-5: 24px;
+  --af-space-6: 32px;
+  --af-space-7: 48px;
+  --af-space-8: 64px;
+  --af-space-9: 96px;
+}
+
+/* === Dark Mode（通过父级 class 切换） === */
+.dark {
+  --af-background: var(--af-gray-950);
+  --af-foreground: var(--af-gray-50);
+  --af-card: var(--af-gray-900);
+  --af-card-foreground: var(--af-gray-50);
+  --af-popover: var(--af-gray-900);
+  --af-popover-foreground: var(--af-gray-50);
+  --af-primary: var(--af-gray-0);
+  --af-primary-foreground: var(--af-gray-950);
+  --af-secondary: var(--af-gray-800);
+  --af-secondary-foreground: var(--af-gray-100);
+  --af-muted: var(--af-gray-800);
+  --af-muted-foreground: var(--af-gray-400);
+  --af-border: var(--af-gray-800);
+  --af-input: var(--af-gray-800);
+  --af-ring: var(--af-gray-100);
+
+  --af-surface: var(--af-gray-900);
+  --af-surface-2: var(--af-gray-800);
+  --af-ink: var(--af-gray-50);
+  --af-ink-2: var(--af-gray-400);
+  --af-ink-3: var(--af-gray-600);
+  --af-line: var(--af-gray-800);
+  --af-brand: var(--af-gray-0);
+  --af-brand-ink: var(--af-gray-950);
+
+  --af-state-success: #22c55e;
+  --af-state-success-bg: rgba(34, 197, 94, 0.12);
+  --af-state-warning: #eab308;
+  --af-state-warning-bg: rgba(234, 179, 8, 0.12);
+  --af-state-error: #ef4444;
+  --af-state-error-bg: rgba(239, 68, 68, 0.12);
+  --af-state-info: #3b82f6;
+  --af-state-info-bg: rgba(59, 130, 246, 0.12);
+
+  --af-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.16);
+  --af-shadow-2: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  --af-shadow-3: 0 24px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* === 基础排版工具类 === */
+.font-sans { font-family: var(--af-font-sans); }
+.font-mono { font-family: var(--af-font-mono); }
+
+/* === 滚动条极简样式 === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--af-gray-300); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: var(--af-gray-700); }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--af-background);
+    --color-foreground: var(--af-foreground);
+    --color-card: var(--af-card);
+    --color-card-foreground: var(--af-card-foreground);
+    --color-popover: var(--af-popover);
+    --color-popover-foreground: var(--af-popover-foreground);
+    --color-primary: var(--af-primary);
+    --color-primary-foreground: var(--af-primary-foreground);
+    --color-secondary: var(--af-secondary);
+    --color-secondary-foreground: var(--af-secondary-foreground);
+    --color-muted: var(--af-muted);
+    --color-muted-foreground: var(--af-muted-foreground);
+    --color-border: var(--af-border);
+    --color-input: var(--af-input);
+    --color-ring: var(--af-ring);
+    --radius-sm: var(--af-radius-small);
+    --radius-md: var(--af-radius-medium);
+    --radius-lg: var(--af-radius-large);
+    --radius-xl: var(--af-radius-xlarge);
+  }
+  @layer base {
+    body { background: var(--af-background); color: var(--af-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--af-background); }
+      .text-background { color: var(--af-background); }
+      .border-background { border-color: var(--af-background); }
+      .ring-background { --tw-ring-color: var(--af-background); }
+      .bg-foreground { background-color: var(--af-foreground); }
+      .text-foreground { color: var(--af-foreground); }
+      .border-foreground { border-color: var(--af-foreground); }
+      .ring-foreground { --tw-ring-color: var(--af-foreground); }
+      .bg-card { background-color: var(--af-card); }
+      .text-card { color: var(--af-card); }
+      .border-card { border-color: var(--af-card); }
+      .ring-card { --tw-ring-color: var(--af-card); }
+      .bg-card-foreground { background-color: var(--af-card-foreground); }
+      .text-card-foreground { color: var(--af-card-foreground); }
+      .border-card-foreground { border-color: var(--af-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--af-card-foreground); }
+      .bg-popover { background-color: var(--af-popover); }
+      .text-popover { color: var(--af-popover); }
+      .border-popover { border-color: var(--af-popover); }
+      .ring-popover { --tw-ring-color: var(--af-popover); }
+      .bg-popover-foreground { background-color: var(--af-popover-foreground); }
+      .text-popover-foreground { color: var(--af-popover-foreground); }
+      .border-popover-foreground { border-color: var(--af-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--af-popover-foreground); }
+      .bg-primary { background-color: var(--af-primary); }
+      .text-primary { color: var(--af-primary); }
+      .border-primary { border-color: var(--af-primary); }
+      .ring-primary { --tw-ring-color: var(--af-primary); }
+      .bg-primary-foreground { background-color: var(--af-primary-foreground); }
+      .text-primary-foreground { color: var(--af-primary-foreground); }
+      .border-primary-foreground { border-color: var(--af-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--af-primary-foreground); }
+      .bg-secondary { background-color: var(--af-secondary); }
+      .text-secondary { color: var(--af-secondary); }
+      .border-secondary { border-color: var(--af-secondary); }
+      .ring-secondary { --tw-ring-color: var(--af-secondary); }
+      .bg-secondary-foreground { background-color: var(--af-secondary-foreground); }
+      .text-secondary-foreground { color: var(--af-secondary-foreground); }
+      .border-secondary-foreground { border-color: var(--af-secondary-foreground); }
+      .ring-secondary-foreground { --tw-ring-color: var(--af-secondary-foreground); }
+      .bg-muted { background-color: var(--af-muted); }
+      .text-muted { color: var(--af-muted); }
+      .border-muted { border-color: var(--af-muted); }
+      .ring-muted { --tw-ring-color: var(--af-muted); }
+      .bg-muted-foreground { background-color: var(--af-muted-foreground); }
+      .text-muted-foreground { color: var(--af-muted-foreground); }
+      .border-muted-foreground { border-color: var(--af-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--af-muted-foreground); }
+      .bg-border { background-color: var(--af-border); }
+      .text-border { color: var(--af-border); }
+      .border-border { border-color: var(--af-border); }
+      .ring-border { --tw-ring-color: var(--af-border); }
+      .bg-input { background-color: var(--af-input); }
+      .text-input { color: var(--af-input); }
+      .border-input { border-color: var(--af-input); }
+      .ring-input { --tw-ring-color: var(--af-input); }
+      .bg-ring { background-color: var(--af-ring); }
+      .text-ring { color: var(--af-ring); }
+      .border-ring { border-color: var(--af-ring); }
+      .ring-ring { --tw-ring-color: var(--af-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen bg-background text-foreground font-sans antialiased">
+    <!-- 顶部导航栏 -->
+    <header class="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-border">
+        <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+            <a href="./index.html" data-dom-id="nav-logo" class="text-lg font-semibold tracking-tight text-foreground hover:opacity-80 transition">
+                AI 论坛
+            </a>
+            <nav class="flex items-center gap-1">
+                <a href="./search.html" data-dom-id="nav-search" class="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">搜索</span>
+                </a>
+                <a href="./qa.html" data-dom-id="nav-ask" class="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                    <i data-lucide="help-circle" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">答疑</span>
+                </a>
+                <a href="./editor.html" data-dom-id="nav-create" class="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">发布</span>
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-8 space-y-8">
+        <!-- 用户资料卡 -->
+        <section class="bg-card border border-border rounded-xl p-6 shadow-sm">
+            <div class="flex flex-col md:flex-row gap-6 items-start">
+                <div class="shrink-0 w-24 h-24 md:w-28 md:h-28 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center text-3xl font-semibold">
+                    李
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div>
+                            <h1 class="text-2xl font-semibold text-card-foreground">李思源</h1>
+                            <p class="text-sm text-muted-foreground mt-1">@lisiyuan · AI 产品经理 · 北京</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="px-4 py-2 rounded-md text-sm font-medium border border-border bg-card text-card-foreground hover:bg-muted transition">
+                                编辑资料
+                            </button>
+                            <button type="button" class="px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition">
+                                关注
+                            </button>
+                        </div>
+                    </div>
+                    <p class="mt-4 text-card-foreground leading-relaxed">
+                        关注大模型应用落地、人机交互与社区治理。喜欢把复杂的技术概念讲清楚，也乐于记录产品思考过程中的踩坑经验。
+                    </p>
+                    <div class="mt-4 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span>2023 年 6 月加入</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 数据指标区 -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4" aria-label="用户数据指标">
+            <article class="bg-card border border-border rounded-lg p-4 text-center">
+                <p class="text-2xl font-semibold tabular-nums text-card-foreground">128</p>
+                <p class="text-sm text-muted-foreground mt-1">发帖</p>
+            </article>
+            <article class="bg-card border border-border rounded-lg p-4 text-center">
+                <p class="text-2xl font-semibold tabular-nums text-card-foreground">342</p>
+                <p class="text-sm text-muted-foreground mt-1">收藏</p>
+            </article>
+            <article class="bg-card border border-border rounded-lg p-4 text-center">
+                <p class="text-2xl font-semibold tabular-nums text-card-foreground">86</p>
+                <p class="text-sm text-muted-foreground mt-1">关注</p>
+            </article>
+            <article class="bg-card border border-border rounded-lg p-4 text-center">
+                <p class="text-2xl font-semibold tabular-nums text-card-foreground">1,204</p>
+                <p class="text-sm text-muted-foreground mt-1">粉丝</p>
+            </article>
+            <article class="bg-card border border-border rounded-lg p-4 text-center">
+                <p class="text-2xl font-semibold tabular-nums text-card-foreground">8,736</p>
+                <p class="text-sm text-muted-foreground mt-1">影响力</p>
+            </article>
+        </section>
+
+        <!-- 主体：内容标签 + 影响力卡片 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 内容列表标签 -->
+                <nav aria-label="个人主页标签" class="border-b border-border">
+                    <ul class="flex gap-2 -mb-px overflow-x-auto no-scrollbar">
+                        <li>
+                            <button type="button" data-dom-id="tab-posts" class="px-4 py-2.5 text-sm font-medium border-b-2 border-foreground text-foreground whitespace-nowrap transition">
+                                发帖
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" data-dom-id="tab-favorites" class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground whitespace-nowrap transition">
+                                收藏
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" data-dom-id="tab-following" class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground whitespace-nowrap transition">
+                                关注
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" data-dom-id="tab-followers" class="px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-muted-foreground hover:text-foreground whitespace-nowrap transition">
+                                粉丝
+                            </button>
+                        </li>
+                    </ul>
+                </nav>
+
+                <!-- 发帖标签内容 -->
+                <section aria-labelledby="tab-posts" class="space-y-4">
+                    <a href="./post.html" data-dom-id="profile-post-1" class="block bg-card border border-border rounded-lg p-5 hover:border-muted-foreground/30 transition">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span class="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">产品思考</span>
+                            <span>2 天前</span>
+                        </div>
+                        <h2 class="mt-3 text-lg font-semibold text-card-foreground">为什么 AI 搜索的"可信度"比"快"更重要</h2>
+                        <p class="mt-2 text-sm text-muted-foreground line-clamp-2">
+                            当用户把问题抛给 AI 时，真正焦虑的不是等待时间，而是答案是否可靠。这篇文章从产品角度拆解可信度的三个维度：来源透明、置信度表达与可回溯性。
+                        </p>
+                        <div class="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                <span class="tabular-nums">4.2k</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="message-square" class="w-4 h-4"></i>
+                                <span class="tabular-nums">56</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="heart" class="w-4 h-4"></i>
+                                <span class="tabular-nums">218</span>
+                            </span>
+                        </div>
+                    </a>
+
+                    <a href="./post.html" data-dom-id="profile-post-2" class="block bg-card border border-border rounded-lg p-5 hover:border-muted-foreground/30 transition">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span class="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">工具推荐</span>
+                            <span>1 周前</span>
+                        </div>
+                        <h2 class="mt-3 text-lg font-semibold text-card-foreground">我常用的 5 个提示词调试小技巧</h2>
+                        <p class="mt-2 text-sm text-muted-foreground line-clamp-2">
+                            提示词不是越长越好。分享几个在日常工作中反复验证有效的方法：角色限定、输出格式约束、反例注入、迭代记录与版本对比。
+                        </p>
+                        <div class="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                <span class="tabular-nums">3.1k</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="message-square" class="w-4 h-4"></i>
+                                <span class="tabular-nums">34</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="heart" class="w-4 h-4"></i>
+                                <span class="tabular-nums">156</span>
+                            </span>
+                        </div>
+                    </a>
+                </section>
+
+                <!-- 收藏标签占位 -->
+                <section aria-labelledby="tab-favorites" class="hidden space-y-4">
+                    <div class="bg-card border border-border rounded-lg p-5">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span class="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">技术讨论</span>
+                            <span>3 天前收藏</span>
+                        </div>
+                        <h2 class="mt-3 text-lg font-semibold text-card-foreground">RAG 系统里容易被忽视的召回策略</h2>
+                        <p class="mt-2 text-sm text-muted-foreground line-clamp-2">
+                            [收藏占位] 这里将展示用户收藏的帖子列表，每条收藏保留原文标题、摘要与收藏时间。
+                        </p>
+                    </div>
+                    <div class="text-center py-12 text-muted-foreground">
+                        <p>更多收藏内容占位</p>
+                    </div>
+                </section>
+
+                <!-- 关注标签占位 -->
+                <section aria-labelledby="tab-following" class="hidden space-y-4">
+                    <a href="./profile.html" data-dom-id="following-user-1" class="flex items-center justify-between bg-card border border-border rounded-lg p-4 hover:border-muted-foreground/30 transition">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium">陈</div>
+                            <div>
+                                <p class="text-sm font-medium text-card-foreground">陈明远</p>
+                                <p class="text-xs text-muted-foreground">@chenmy · 算法工程师</p>
+                            </div>
+                        </div>
+                        <button type="button" class="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition">已关注</button>
+                    </a>
+                    <div class="text-center py-12 text-muted-foreground">
+                        <p>关注用户列表占位</p>
+                    </div>
+                </section>
+
+                <!-- 粉丝标签占位 -->
+                <section aria-labelledby="tab-followers" class="hidden space-y-4">
+                    <a href="./profile.html" data-dom-id="follower-user-1" class="flex items-center justify-between bg-card border border-border rounded-lg p-4 hover:border-muted-foreground/30 transition">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-medium">王</div>
+                            <div>
+                                <p class="text-sm font-medium text-card-foreground">王小雅</p>
+                                <p class="text-xs text-muted-foreground">@wangxiaoya · 设计师</p>
+                            </div>
+                        </div>
+                        <button type="button" class="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition">回关</button>
+                    </a>
+                    <div class="text-center py-12 text-muted-foreground">
+                        <p>粉丝列表占位</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 社区影响力指标 -->
+            <aside class="lg:col-span-1">
+                <div class="bg-card border border-border rounded-xl p-6 shadow-sm sticky top-24">
+                    <h2 class="text-base font-semibold text-card-foreground flex items-center gap-2">
+                        <i data-lucide="zap" class="w-4 h-4 text-muted-foreground"></i>
+                        社区影响力
+                    </h2>
+                    <div class="mt-6 space-y-5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-muted-foreground">影响力分数</span>
+                            <span class="text-xl font-semibold tabular-nums text-card-foreground">8,736</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-muted-foreground flex items-center gap-1.5">
+                                <i data-lucide="thumbs-up" class="w-4 h-4"></i>
+                                获赞总数
+                            </span>
+                            <span class="text-lg font-semibold tabular-nums text-card-foreground">12,408</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-muted-foreground flex items-center gap-1.5">
+                                <i data-lucide="bookmark" class="w-4 h-4"></i>
+                                被收藏数
+                            </span>
+                            <span class="text-lg font-semibold tabular-nums text-card-foreground">2,631</span>
+                        </div>
+                    </div>
+                    <p class="mt-6 text-xs text-muted-foreground leading-relaxed">
+                        影响力分数综合了发帖质量、互动活跃度与社区贡献，每日更新。
+                    </p>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="border-t border-border mt-12 bg-card">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-sm text-muted-foreground">© 2026 AI 论坛原型. 保留所有权利.</p>
+                <nav class="flex items-center gap-4 text-sm text-muted-foreground">
+                    <a href="#" class="hover:text-foreground transition">关于我们</a>
+                    <a href="#" class="hover:text-foreground transition">社区规范</a>
+                    <a href="#" class="hover:text-foreground transition">隐私政策</a>
+                    <a href="#" class="hover:text-foreground transition">联系我们</a>
+                </nav>
+            </div>
+        </div>
+    </footer>
+
+    <script>lucide.createIcons();</script>
+</body>
+</html>
