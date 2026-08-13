@@ -21,6 +21,7 @@ import {
 } from './utils/cache.js'
 import { verifyPassword, hashPassword, signToken, createSession, destroySession } from './utils/auth.js'
 import { authenticate, requireAuth } from './utils/middleware.js'
+import { health as llmHealth } from './utils/llm.js'
 
 dotenv.config()
 
@@ -500,7 +501,7 @@ async function handleGetInteractions(req, res, postId, authUser) {
  * - 不存在记录 → 插入 → 计数 +1
  * 同时失效帖子详情缓存 + 评论缓存（含点赞数）+ 列表缓存（显示点赞数）
  */
-async function handleTogglePostLike(req, res, postId, authUser) {
+async function handleTogglePostLike(req, res, authUser, postId) {
   const userId = authUser.userId
   const { rows: existing } = await dbQuery(
     `SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2`,
@@ -550,7 +551,7 @@ async function handleTogglePostLike(req, res, postId, authUser) {
 /**
  * 帖子收藏 / 取消收藏（toggle 模式）
  */
-async function handleTogglePostFavorite(req, res, postId, authUser) {
+async function handleTogglePostFavorite(req, res, authUser, postId) {
   const userId = authUser.userId
   const { rows: existing } = await dbQuery(
     `SELECT 1 FROM post_favorites WHERE post_id = $1 AND user_id = $2`,
@@ -598,7 +599,7 @@ async function handleTogglePostFavorite(req, res, postId, authUser) {
  * 必填：content；可选：parentId
  * 成功后回查评论树并返回最新全量数据，同时更新 posts.comments_count
  */
-async function handleCreateComment(req, res, postId, authUser) {
+async function handleCreateComment(req, res, authUser, postId) {
   const body = await readJsonBody(req)
   const { content, parentId } = body
   if (!content || !content.trim()) {
@@ -697,7 +698,7 @@ async function handleListCommentsNoSend(postId) {
  * 评论点赞 / 取消点赞（toggle 模式）
  * 容错：comment_likes 表未迁移时仅更新计数（不报错）
  */
-async function handleToggleCommentLike(req, res, commentId, authUser) {
+async function handleToggleCommentLike(req, res, authUser, commentId) {
   const userId = authUser.userId
 
   // 先查询评论是否存在 + 获取 post_id 便于失效缓存
@@ -1184,6 +1185,13 @@ function serveSpaFallback(res) {
 }
 
 // === HTTP 服务器主流程 ===
+
+const llmStatus = llmHealth()
+if (llmStatus.ok) {
+  console.log(`✅ LLM configured: model=${llmStatus.model}`)
+} else {
+  console.log('⚠️  DEEPSEEK_API_KEY not set, AI routes degraded')
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`)
