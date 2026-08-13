@@ -6,6 +6,12 @@ export default defineConfig({
   server: {
     port: 5174,
     open: true,
+    proxy: {
+      '/api/forum': {
+        target: 'http://localhost:8787',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',
