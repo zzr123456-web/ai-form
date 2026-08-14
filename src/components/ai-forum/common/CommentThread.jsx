@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { Heart, MessageCircle, Send, X, Flag } from 'lucide-react'
 import Avatar from './Avatar.jsx'
 import ReportDialog from './ReportDialog.jsx'
@@ -29,9 +29,21 @@ export default function CommentThread({
   const [replySubmittingId, setReplySubmittingId] = useState(null)
   // 举报目标评论 id（null 表示弹窗关闭）
   const [reportCommentId, setReportCommentId] = useState(null)
+  // 回复输入框 ref，用于自动聚焦并将光标定位到 @昵称 之后
+  const replyInputRef = useRef(null)
 
   // 快速查询 Set，避免每次 O(n) includes
   const likedSet = useMemo(() => new Set(likedCommentIds || []), [likedCommentIds])
+
+  // 当回复目标切换时，自动聚焦输入框并把光标移到末尾
+  useEffect(() => {
+    if (replyTargetId && replyInputRef.current) {
+      const el = replyInputRef.current
+      el.focus()
+      const len = el.value.length
+      el.setSelectionRange(len, len)
+    }
+  }, [replyTargetId])
 
   /** 评论点赞：未登录拦截，已登录交给父组件处理（持久化到 DB） */
   const toggleLike = (targetId) => {
@@ -39,10 +51,29 @@ export default function CommentThread({
     if (typeof onLikeComment === 'function') onLikeComment(targetId)
   }
 
-  /** 点击"回复"按钮：展开/收起回复输入框 */
+  /** 点击"回复"按钮：展开回复输入框并自动插入 @昵称 前缀 */
   const handleToggleReply = (commentId) => {
     if (!requireAuth('登录后回复评论')) return
-    setReplyTargetId((prev) => (prev === commentId ? null : commentId))
+    if (replyTargetId === commentId) {
+      // 再次点击同一个：关闭输入框
+      setReplyTargetId(null)
+      return
+    }
+    // 查找被回复人的昵称
+    const targetComment = comments.find((c) => c.id === commentId)
+    const targetAuthor = targetComment
+      ? users.find((u) => u.id === targetComment.authorId)
+      : null
+    const nickname = targetAuthor?.nickname || '用户'
+    // 自动插入 @昵称 前缀，用户直接在后面输入正文即可
+    const prefix = `@${nickname} `
+    setReplyTextMap((prev) => ({
+      ...prev,
+      [commentId]: prev[commentId]?.startsWith(`@${nickname}`)
+        ? prev[commentId]
+        : `${prefix}${prev[commentId] || ''}`,
+    }))
+    setReplyTargetId(commentId)
   }
 
   /** 提交回复：交给父组件 onReplySubmit */
@@ -135,12 +166,13 @@ export default function CommentThread({
                 {showReplyBox ? (
                   <div className="mt-3 rounded-af-lg border border-border p-3 bg-afmuted/20">
                     <textarea
+                      ref={replyInputRef}
                       value={replyTextMap[comment.id] || ''}
                       onChange={(e) => setReplyTextMap((prev) => ({
                         ...prev,
                         [comment.id]: e.target.value,
                       }))}
-                      placeholder={`回复 @${commentAuthor?.nickname || '用户'}...`}
+                      placeholder="输入回复内容..."
                       rows={2}
                       className="w-full rounded-af-md border border-input bg-background p-2 text-sm text-foreground placeholder:text-afmuted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                       disabled={replyBusy}
