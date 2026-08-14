@@ -162,6 +162,7 @@ function mapUser(row) {
     joinedAt: toISO(row.joined_at),
     status: row.status,
     roles: row.roles || [],
+    devLevel: row.dev_level || null,
   }
 }
 
@@ -715,10 +716,19 @@ async function handleListComments(req, res, postId) {
     }
   }
 
-  // 将回复挂载到对应顶层评论
-  for (const top of topComments) {
-    top.replies = repliesByParent.get(top.id) || []
+  // 递归挂载所有层级的 replies（不仅限于顶层），支持楼中楼任意深度嵌套
+  // 关键：必须递归到 replies 中的每条评论继续挂载其 replies，否则 depth>=2 的回复（如 AI 三层回复）会丢失
+  // 复用 handleListCommentsNoSend 中已验证的迭代式递归逻辑，保持两端一致
+  const assignRepliesRecursively = (nodes) => {
+    for (const node of nodes) {
+      const children = repliesByParent.get(node.id)
+      if (children && children.length > 0) {
+        node.replies = children
+        assignRepliesRecursively(children)
+      }
+    }
   }
+  assignRepliesRecursively(topComments)
   await cacheSet(cacheKey, topComments, TTL_COMMENTS)
   return sendJson(res, 200, topComments)
 }
@@ -1186,6 +1196,14 @@ async function handleAIGenerate(req, res, authUser) {
     return sendJson(res, 400, { error: '缺少必填字段：messages（非空数组）' })
   }
 
+  // 获取用户 devLevel，将话术约束以 system 角色前置注入，使所有 AI 回复均适配用户水平
+  const { rows: devRows } = await dbQuery(
+    `SELECT dev_level FROM users WHERE id = $1`,
+    [userId]
+  )
+  const devLevel = devRows[0]?.dev_level || null
+  const stylePrompt = getDevLevelStylePrompt(devLevel, 'AI 对话助手')
+
   const startMs = Date.now()
   let success = false
   let errorMsg = null
@@ -1193,7 +1211,13 @@ async function handleAIGenerate(req, res, authUser) {
   let content = ''
 
   try {
-    const result = await createChatCompletion(messages, { model, temperature, max_tokens })
+    const result = await createChatCompletion(
+      [
+        { role: 'system', content: stylePrompt },
+        ...messages,
+      ],
+      { model, temperature, max_tokens }
+    )
     success = true
     usage = result.usage
     content = result.content
@@ -1233,6 +1257,15 @@ async function handleAIStream(req, res, authUser) {
     return sendJson(res, 400, { error: '缺少必填字段：messages（非空数组）' })
   }
 
+  // 按 devLevel 调整回答话术（新手直白、资深专业），与 handleAIGenerate 保持一致
+  const { rows: devRows } = await dbQuery(
+    `SELECT dev_level FROM users WHERE id = $1`,
+    [userId]
+  )
+  const devLevel = devRows[0]?.dev_level || null
+  const stylePrompt = getDevLevelStylePrompt(devLevel, 'AI 对话助手')
+  const composedMessages = [{ role: 'system', content: stylePrompt }, ...messages]
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache',
@@ -1261,7 +1294,7 @@ async function handleAIStream(req, res, authUser) {
 
   try {
     await streamChatCompletion(
-      messages,
+      composedMessages,
       { model, temperature, max_tokens },
       (text) => {
         res.write(`data: ${JSON.stringify({ content: text })}\n\n`)
@@ -1306,9 +1339,17 @@ async function handleAIPostAssist(req, res, authUser) {
   }
   console.log(`[AI:post-assist] 草稿长度=${content.length} board_id=${board_id || '无'} tags=${Array.isArray(current_tags) ? current_tags.length : 0}个`)
 
+  // 读取用户开发者等级，决定语气（新手→分步解释，资深→直接输出JSON）
+  const { rows: devRows } = await dbQuery(
+    `SELECT dev_level FROM users WHERE id = $1`,
+    [userId]
+  )
+  const devLevel = devRows[0]?.dev_level || null
+  const stylePrompt = getDevLevelStylePrompt(devLevel, '发帖辅助助手')
+
   const systemPrompt = `你是一个论坛发帖助手。请分析用户的草稿内容，返回JSON格式的辅助建议：
 {"title_candidates": ["标题1","标题2","标题3"], "tag_suggestions": ["标签1","标签2","标签3","标签4"], "polished_content": "润色后的正文", "recommended_board_id": null}
-注意：标签3-5个，标题区分求助/讨论/经验类型，保留用户原意不灌水。只返回JSON，不要其他文本。`
+注意：标签3-5个，标题区分求助/讨论/经验类型，保留用户原意不灌水。只返回JSON，不要其他文本。${stylePrompt}`
 
   // 把用户当前标签与板块作为上下文传入，便于模型给出差异化建议
   const userMessage = `草稿内容：${content}\n当前板块ID：${board_id || '未指定'}\n当前标签：${Array.isArray(current_tags) ? current_tags.join('、') : '无'}`
@@ -1926,6 +1967,19 @@ async function ensurePhase4Tables() {
 }
 
 /**
+ * 启动时确保 users 表存在 dev_level 列（幂等）
+ * dev_level：junior=初级AI开发者 / senior=资深AI开发者 / NULL=未设置
+ */
+async function ensureDevLevelColumn() {
+  try {
+    await dbQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS dev_level TEXT`)
+    console.log('📦 users.dev_level 列自检完成')
+  } catch (err) {
+    console.warn('[ensureDevLevelColumn] 执行失败（可忽略）:', err.message)
+  }
+}
+
+/**
  * AI 小助手的固定用户 ID，发帖自动回复和 @ai小助手 触发的回复都以该用户身份发布
  */
 const AI_ASSISTANT_USER_ID = 'u_ai_assistant'
@@ -1954,6 +2008,22 @@ async function ensureAIAssistantUser() {
   } catch (err) {
     console.warn('[ensureAIAssistantUser] 初始化失败（可忽略，首次调用时再创建）:', err.message)
   }
+}
+
+/**
+ * 根据用户开发者等级，返回适配的话术提示词片段（拼到 systemPrompt 末尾）
+ * - junior / 未设置：直白易懂，避免专业术语，必要时用类比解释，适合新手
+ * - senior：使用专业术语、行业黑话、技术细节，直接给结论与高级建议，省略基础铺垫
+ * @param {string|null} devLevel 'junior' | 'senior' | null
+ * @param {string} [role='回答者'] 本次 AI 扮演的角色名，用于提示词语气贴合
+ * @returns {string}
+ */
+function getDevLevelStylePrompt(devLevel, role = '回答者') {
+  if (devLevel === 'senior') {
+    return `\n额外要求：当前提问用户是资深 AI 开发者，回答时请使用专业术语与技术细节，可以直接引用模型、框架、算法、工程化最佳实践等概念；省略基础概念铺垫，默认对方理解常识性背景；可以用代码片段、公式、架构要点等高阶表达；结论优先，不要过度解释基础。`
+  }
+  // junior 或未设置：默认走直白易懂模式，覆盖最大人群
+  return `\n额外要求：当前用户是 AI 初学者或刚入行的初级开发者，回答时请用直白易懂的话语；遇到专业术语时尽量用生活化类比或分步解释；避免堆砌英文缩写（首次出现时给出中文含义）；结构上先给结论、再给步骤、最后举例子；语气鼓励、引导，不要让用户有挫败感。`
 }
 
 /**
@@ -2973,7 +3043,7 @@ async function handleLogin(req, res) {
  */
 async function handleRegister(req, res) {
   const body = await readJsonBody(req)
-  const { nickname, email, password } = body
+  const { nickname, email, password, devLevel } = body
   if (!nickname || !email || !password) {
     return sendJson(res, 400, { error: '请完善注册信息（昵称、邮箱、密码）' })
   }
@@ -2988,6 +3058,8 @@ async function handleRegister(req, res) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return sendJson(res, 400, { error: '邮箱格式不正确' })
   }
+  // devLevel 仅允许 junior / senior / null 三种
+  const validDevLevel = (devLevel === 'junior' || devLevel === 'senior') ? devLevel : null
 
   // 检查 nickname 或 email 是否已存在
   const { rows: existing } = await dbQuery(
@@ -3032,9 +3104,9 @@ async function handleRegister(req, res) {
   const userId = crypto.randomUUID()
   try {
     await dbQuery(
-      `INSERT INTO users (id, nickname, handle, email, password_hash, status, roles, avatar_text, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'active', ARRAY[]::text[], '', NOW(), NOW())`,
-      [userId, nickname, handle, email, passwordHash]
+      `INSERT INTO users (id, nickname, handle, email, password_hash, status, roles, avatar_text, dev_level, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'active', ARRAY[]::text[], '', $6, NOW(), NOW())`,
+      [userId, nickname, handle, email, passwordHash, validDevLevel]
     )
   } catch (err) {
     console.error('[register] 插入用户失败:', err.message)
@@ -3088,6 +3160,32 @@ async function handleMe(req, res, authUser) {
   if (rows.length === 0) {
     return sendJson(res, 404, { error: '用户不存在' })
   }
+  return sendJson(res, 200, { user: mapUser(rows[0]) })
+}
+
+/**
+ * 更新当前登录用户的开发者身份等级（初级 / 资深 AI 开发者）
+ * devLevel 允许：'junior' / 'senior' / null（清除）
+ */
+async function handleUpdateDevLevel(req, res, authUser) {
+  const body = await readJsonBody(req)
+  const { devLevel } = body
+  const valid = devLevel === 'junior' || devLevel === 'senior'
+    ? devLevel
+    : null
+  const userId = authUser.userId
+
+  const { rows } = await dbQuery(
+    `UPDATE users SET dev_level = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [valid, userId]
+  )
+  if (rows.length === 0) {
+    return sendJson(res, 404, { error: '用户不存在' })
+  }
+  // 使缓存失效：用户详情 + 用户列表
+  await cacheDel(userProfileKey(userId))
+  await cacheDel(userListKey())
+
   return sendJson(res, 200, { user: mapUser(rows[0]) })
 }
 
@@ -3165,6 +3263,10 @@ async function matchForumRoute(req, res, pathname, method, url) {
     if (sub === '/auth/me') {
       supportedMethods.push('GET')
       if (method === 'GET') return await requireAuth(handleMe)(req, res)
+    }
+    if (sub === '/users/me/level') {
+      supportedMethods.push('PUT')
+      if (method === 'PUT') return await requireAuth(handleUpdateDevLevel)(req, res)
     }
 
     // === 动态路由：按 '/' 分段解析 ===
@@ -3513,6 +3615,8 @@ server.listen(PORT, async () => {
     await ensurePhase2Tables()
     // Phase4：内容审核相关表与字段（moderation_cases / reports 等）
     await ensurePhase4Tables()
+    // 开发者身份等级列（junior / senior）
+    await ensureDevLevelColumn()
     // AI 小助手用户初始化（发帖自动评论和 @ai小助手 回复的身份）
     await ensureAIAssistantUser()
   }
