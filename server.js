@@ -1090,9 +1090,18 @@ async function handleListCommentsNoSend(postId) {
       topComments.push(comment)
     }
   }
-  for (const top of topComments) {
-    top.replies = repliesByParent.get(top.id) || []
+  // 递归挂载所有层级的 replies（不仅限于顶层），支持楼中楼任意深度嵌套
+  // 使用迭代遍历：先给顶层挂 replies，再对 replies 中的每条评论继续挂 replies
+  const assignRepliesRecursively = (nodes) => {
+    for (const node of nodes) {
+      const children = repliesByParent.get(node.id)
+      if (children && children.length > 0) {
+        node.replies = children
+        assignRepliesRecursively(children)
+      }
+    }
   }
+  assignRepliesRecursively(topComments)
   await cacheSet(commentsKey(postId), topComments, TTL_COMMENTS)
   return topComments
 }
