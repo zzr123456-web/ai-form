@@ -68,7 +68,12 @@ export default function PostDetailPage() {
         return
       }
 
-      setPost(postData)
+      // 将帖子数据写入 state；若当前用户已点赞则补偿 +1（让 post.likes 始终包含本人的赞）
+      if (interactionsData?.liked) {
+        setPost({ ...postData, likes: (postData.likes || 0) + 1 })
+      } else {
+        setPost(postData)
+      }
       // getComments 失败时兜底为空数组，不影响帖子主体展示
       setComments(Array.isArray(commentsData) ? commentsData : [])
       // 互动状态：未登录/无记录时保持默认 false
@@ -415,7 +420,7 @@ export default function PostDetailPage() {
                   }`}
                 >
                   <Heart className={`size-4 ${liked ? 'fill-current' : ''}`} />
-                  {formatNumber((post.likes || 0) + (liked ? 1 : 0))}
+                  {formatNumber(post.likes || 0)}
                 </button>
 
                 {/* 收藏 Star：requireAuth 拦截；已登录本地 favored 切换视觉 */}
