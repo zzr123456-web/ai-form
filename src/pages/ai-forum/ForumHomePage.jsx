@@ -10,6 +10,8 @@ import { formatRelativeTime, formatNumber } from '../../utils/ai-forum/aiForumUt
 const SORT_OPTIONS = [
   { key: 'latest', label: '最新' },
   { key: 'hot', label: '热门' },
+  // 推荐流由后端按个性化/热度算法排序，前端不再二次排序
+  { key: 'recommended', label: '推荐' },
   { key: 'follow', label: '关注' },
 ]
 
@@ -39,12 +41,14 @@ export default function ForumHomePage() {
    * - Promise.all 并行请求，减少首屏等待时间
    * - cancelled 标志避免组件卸载后 setState 导致的内存泄漏警告
    * - 依赖 reloadKey：点击重试按钮时递增以触发重新加载
+   * - 依赖 sort：切换排序时把 sort 透传给后端，让后端按对应策略返回
+   *   （recommended 走后端推荐算法；hot/latest 也由后端排序，前端 sortedPosts 仍会兜底重排）
    */
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    Promise.all([getPosts(), getTopics(), getBoards()])
+    Promise.all([getPosts({ sort }), getTopics(), getBoards()])
       .then(([postData, topicData, boardData]) => {
         if (cancelled) return
         setPosts(postData)
@@ -60,11 +64,15 @@ export default function ForumHomePage() {
     return () => {
       cancelled = true
     }
-  }, [reloadKey])
+  }, [reloadKey, sort])
 
   // 排序后帖子列表：使用 useMemo 缓存，避免每次重渲染重复排序
   // 依赖 posts：异步数据到达后需重新计算排序
   const sortedPosts = useMemo(() => {
+    // recommended：完全采用后端推荐算法返回的顺序，前端不再二次排序
+    if (sort === 'recommended') {
+      return posts
+    }
     // [...posts] 克隆后排序：防止直接修改 state 数组，
     // 否则切回其他排序时源数组顺序已经被打乱
     if (sort === 'hot') {

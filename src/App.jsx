@@ -16,6 +16,7 @@ import UserManagePage from './pages/ai-forum/admin/UserManagePage.jsx'
 import BoardManagePage from './pages/ai-forum/admin/BoardManagePage.jsx'
 import ReportHandlePage from './pages/ai-forum/admin/ReportHandlePage.jsx'
 import OperationConfigPage from './pages/ai-forum/admin/OperationConfigPage.jsx'
+import KnowledgeManagePage from './pages/ai-forum/admin/KnowledgeManagePage.jsx'
 import { AuthProvider } from './components/ai-forum/AuthProvider.jsx'
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="boards" element={<BoardManagePage />} />
           <Route path="reports" element={<ReportHandlePage />} />
           <Route path="config" element={<OperationConfigPage />} />
+          <Route path="knowledge" element={<KnowledgeManagePage />} />
         </Route>
       </Routes>
     </AuthProvider>

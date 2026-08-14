@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, FileCheck, Users, LayoutGrid, Flag, Settings,
+  LayoutDashboard, FileCheck, Users, LayoutGrid, Flag, Settings, BookOpen,
   Sun, Moon, Menu, X, ArrowLeft, Bell
 } from 'lucide-react'
 import { useAuth } from '../AuthProvider.jsx'
@@ -15,6 +15,7 @@ const NAV = [
   { to: '/forum/admin/boards',   label: '版块管理', icon: LayoutGrid },
   { to: '/forum/admin/reports',  label: '举报处理', icon: Flag },
   { to: '/forum/admin/config',   label: '运营配置', icon: Settings },
+  { to: '/forum/admin/knowledge', label: '知识库', icon: BookOpen },
 ]
 
 /**

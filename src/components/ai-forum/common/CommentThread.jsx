@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
-import { Heart, MessageCircle, Send, X } from 'lucide-react'
+import { Heart, MessageCircle, Send, X, Flag } from 'lucide-react'
 import Avatar from './Avatar.jsx'
+import ReportDialog from './ReportDialog.jsx'
 import { useAuth } from '../AuthProvider.jsx'
 
 /**
@@ -26,6 +27,8 @@ export default function CommentThread({
   const [replyTextMap, setReplyTextMap] = useState({})
   // 回复提交 loading 状态
   const [replySubmittingId, setReplySubmittingId] = useState(null)
+  // 举报目标评论 id（null 表示弹窗关闭）
+  const [reportCommentId, setReportCommentId] = useState(null)
 
   // 快速查询 Set，避免每次 O(n) includes
   const likedSet = useMemo(() => new Set(likedCommentIds || []), [likedCommentIds])
@@ -60,10 +63,17 @@ export default function CommentThread({
     setReplyTargetId(null)
   }
 
+  /** 举报评论：未登录拦截，已登录打开举报弹窗 */
+  const handleReport = (commentId) => {
+    if (!requireAuth('登录后举报')) return
+    setReportCommentId(commentId)
+  }
+
   // 无评论时由父组件渲染 EmptyState，此处只做防御性兜底
   if (!Boolean(comments?.length)) return null
 
   return (
+    <>
     <div className="space-y-5">
       {comments.map((comment) => {
         const commentAuthor = users.find((u) => u.id === comment.authorId)
@@ -109,6 +119,15 @@ export default function CommentThread({
                   >
                     <MessageCircle className="size-3.5" />
                     <span>回复</span>
+                  </button>
+                  {/* 举报按钮：小图标，紧邻点赞与回复 */}
+                  <button
+                    type="button"
+                    onClick={() => handleReport(comment.id)}
+                    className="flex items-center gap-1 hover:text-foreground transition-colors p-1 -m-1 rounded hover:bg-afmuted"
+                    aria-label="举报该评论"
+                  >
+                    <Flag className="size-3" />
                   </button>
                 </div>
 
@@ -189,6 +208,15 @@ export default function CommentThread({
                             />
                             <span>{reply.likes || 0}</span>
                           </button>
+                          {/* 举报按钮：小图标，紧邻点赞 */}
+                          <button
+                            type="button"
+                            onClick={() => handleReport(reply.id)}
+                            className="flex items-center gap-1 hover:text-foreground transition-colors p-1 -m-1 rounded hover:bg-afmuted"
+                            aria-label="举报该回复"
+                          >
+                            <Flag className="size-3" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -200,5 +228,15 @@ export default function CommentThread({
         )
       })}
     </div>
+
+      {/* 举报弹窗：reportCommentId 不为 null 时渲染 */}
+      {reportCommentId ? (
+        <ReportDialog
+          target_type="comment"
+          target_id={reportCommentId}
+          onClose={() => setReportCommentId(null)}
+        />
+      ) : null}
+    </>
   )
 }

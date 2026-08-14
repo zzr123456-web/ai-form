@@ -63,6 +63,18 @@ export default function PostEditorPage() {
     })
   }
 
+  // AI 推荐标签「点击添加」：只增不减，同样受 MAX_TAG_COUNT 约束
+  const handleAiTagAdd = (tag) => {
+    if (!tag) return
+    setSelectedTags((prev) => {
+      if (prev.has(tag)) return prev
+      if (prev.size >= MAX_TAG_COUNT) return prev
+      const next = new Set(prev)
+      next.add(tag)
+      return next
+    })
+  }
+
   const handlePreview = () => {
     setShowPreview(true)
   }
@@ -209,7 +221,14 @@ export default function PostEditorPage() {
         {/* 右栏：AI 助手面板 */}
         <aside className="w-full md:w-1/3 md:pl-6">
           <div className="md:sticky md:top-6">
-            <AIDraftPanel />
+            <AIDraftPanel
+              content={content}
+              boardId={selectedBoardId}
+              currentTags={Array.from(selectedTags)}
+              onTitleSelect={(t) => setTitle(t)}
+              onTagAdd={handleAiTagAdd}
+              onContentReplace={(c) => setContent(c)}
+            />
           </div>
         </aside>
       </div>

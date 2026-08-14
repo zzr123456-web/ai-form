@@ -282,6 +282,7 @@ async function handleListBoards(req, res) {
   const cached = await cacheGet(cacheKey)
   if (cached) return sendJson(res, 200, cached)
   // 动态统计每个版块的真实帖子数和今日新帖数，避免 boards 表静态字段与实际数据脱节
+  // 过滤已归档版块（status='archived' 不展示，NULL 兼容历史无 status 字段的数据）
   const { rows } = await dbQuery(
     `SELECT b.*,
             COALESCE(pc.cnt, 0) AS real_post_count,
@@ -300,6 +301,7 @@ async function handleListBoards(req, res) {
          AND created_at >= CURRENT_DATE
        GROUP BY board_id
      ) tc ON tc.board_id = b.id
+     WHERE b.status != 'archived' OR b.status IS NULL
      ORDER BY real_post_count DESC`
   )
   const result = rows.map((row) => ({
@@ -523,6 +525,77 @@ function detectSensitiveInfo(text) {
 }
 
 /**
+ * AI 内容风险分级：调用 LLM 对内容进行风险分级，返回 { risk_level, risk_type }
+ * - 失败时返回默认值 { risk_level: 'none', risk_type: 'none' }，永不抛错（避免影响主流程）
+ * - boardId 用于查询版块治理模式：safety_first 版块将 low 提升为 medium（降低阈值）
+ */
+async function detectContentRisk(content, boardId) {
+  try {
+    if (!content || typeof content !== 'string') {
+      return { risk_level: 'none', risk_type: 'none' }
+    }
+    const systemPrompt = `你是一个内容安全审核助手。请对以下内容进行风险分级，只返回JSON：
+{"risk_level": "none|low|medium|high", "risk_type": "spam|abuse|sensitive|misinformation|low_quality|none"}
+风险分级标准：
+- none: 正常内容
+- low: 轻微不当但不违规
+- medium: 可能违规但不确定
+- high: 明显违规或高风险`
+    const { content: raw } = await createChatCompletion([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content },
+    ], { temperature: 0, max_tokens: 128 })
+    // 兼容 LLM 可能包裹 ```json``` 或多余文本的情况，提取首个 JSON 对象
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (!match) return { risk_level: 'none', risk_type: 'none' }
+    const parsed = JSON.parse(match[0])
+    const riskLevel = ['none', 'low', 'medium', 'high'].includes(parsed.risk_level)
+      ? parsed.risk_level
+      : 'none'
+    const riskType = parsed.risk_type || 'none'
+
+    // 版块治理模式 safety_first：将 low 提升为 medium（降低阈值，更严格）
+    if (riskLevel === 'low' && boardId) {
+      const { rows } = await dbQuery(
+        `SELECT governance_mode FROM boards WHERE id = $1`,
+        [boardId]
+      )
+      if (rows.length > 0 && rows[0].governance_mode === 'safety_first') {
+        return { risk_level: 'medium', risk_type: riskType }
+      }
+    }
+    return { risk_level: riskLevel, risk_type: riskType }
+  } catch (err) {
+    // LLM 调用失败或解析失败时降级为无风险，避免阻断主流程
+    console.warn('[detectContentRisk] 风险分级失败:', err.message)
+    return { risk_level: 'none', risk_type: 'none' }
+  }
+}
+
+/**
+ * 异步写入风险检测结果：
+ * 1. 更新 posts/comments 的 risk_level
+ * 2. medium/high 时创建 moderation_case 进入审核队列
+ * 该函数不抛错、不阻塞主流程，统一用 .catch 兜底
+ */
+async function applyContentRisk({ targetType, targetId, content, boardId }) {
+  const { risk_level, risk_type } = await detectContentRisk(content, boardId)
+  if (targetType === 'post') {
+    await dbQuery(`UPDATE posts SET risk_level = $1 WHERE id = $2`, [risk_level, targetId])
+  } else {
+    await dbQuery(`UPDATE comments SET risk_level = $1 WHERE id = $2`, [risk_level, targetId])
+  }
+  // 仅 medium / high 级别进入审核队列，避免低风险内容淹没队列
+  if (risk_level === 'medium' || risk_level === 'high') {
+    await dbQuery(
+      `INSERT INTO moderation_cases (id, target_type, target_id, source, risk_type, risk_level, status, created_at)
+       VALUES ($1, $2, $3, 'ai', $4, $5, 'open', NOW())`,
+      [crypto.randomUUID(), targetType, targetId, risk_type, risk_level]
+    )
+  }
+}
+
+/**
  * 创建帖子
  * 必填：title、content、boardId；可选：authorId（默认 u_alex）、tags、summary
  */
@@ -564,6 +637,8 @@ async function handleCreatePost(req, res) {
   if (!post) {
     return sendJson(res, 500, { error: '帖子创建后回查失败' })
   }
+  // 异步触发 AI 风险分级：不阻塞响应，失败静默忽略（不影响发帖主流程）
+  applyContentRisk({ targetType: 'post', targetId: id, content, boardId }).catch(() => {})
   // 发帖后清除列表缓存（排序变化）和版块缓存（post_count 变化），避免脏读
   await cacheDelPattern('af:posts:list:*')
   await cacheDel(boardListKey())
@@ -872,11 +947,12 @@ async function handleCreateComment(req, res, authUser, postId) {
     return sendJson(res, 400, { error: '评论内容不能为空' })
   }
 
-  // 校验帖子是否存在
-  const { rows: postRows } = await dbQuery(`SELECT id FROM posts WHERE id = $1`, [postId])
+  // 校验帖子是否存在（同时取 board_id 用于评论风险分级的版块治理模式判断）
+  const { rows: postRows } = await dbQuery(`SELECT id, board_id FROM posts WHERE id = $1`, [postId])
   if (postRows.length === 0) {
     return sendJson(res, 404, { error: '帖子不存在' })
   }
+  const postBoardId = postRows[0].board_id
 
   // 若有 parentId，校验父评论属于同一条帖子
   if (parentId) {
@@ -911,6 +987,14 @@ async function handleCreateComment(req, res, authUser, postId) {
     cacheDel(postKey(postId)),
     cacheDelPattern('af:posts:list:*'),
   ])
+
+  // 异步触发 AI 风险分级：不阻塞响应，失败静默忽略（不影响评论主流程）
+  applyContentRisk({
+    targetType: 'comment',
+    targetId: id,
+    content: content.trim(),
+    boardId: postBoardId,
+  }).catch(() => {})
 
   // 回查最新评论树，返回给前端替换（保证强一致）
   const listResult = await handleListCommentsNoSend(postId)
@@ -1140,6 +1224,377 @@ async function handleAIStream(req, res, authUser) {
 }
 
 /**
+ * AI 发帖辅助：分析草稿内容，返回标题候选 / 标签建议 / 润色正文
+ * 调用 LLM 后解析 JSON，解析失败返回 502；成功记录到 ai_usage_logs
+ */
+async function handleAIPostAssist(req, res, authUser) {
+  const userId = authUser.userId
+  const rate = await aiRateLimit(userId)
+  if (!rate.ok) {
+    return sendJson(res, 429, { error: 'AI 调用过于频繁，请稍后再试' })
+  }
+
+  const body = await readJsonBody(req)
+  const { content, board_id, current_tags } = body
+  if (!content || typeof content !== 'string') {
+    return sendJson(res, 400, { error: '缺少必填字段：content' })
+  }
+
+  const systemPrompt = `你是一个论坛发帖助手。请分析用户的草稿内容，返回JSON格式的辅助建议：
+{"title_candidates": ["标题1","标题2","标题3"], "tag_suggestions": ["标签1","标签2","标签3","标签4"], "polished_content": "润色后的正文", "recommended_board_id": null}
+注意：标签3-5个，标题区分求助/讨论/经验类型，保留用户原意不灌水。只返回JSON，不要其他文本。`
+
+  // 把用户当前标签与板块作为上下文传入，便于模型给出差异化建议
+  const userMessage = `草稿内容：${content}\n当前板块ID：${board_id || '未指定'}\n当前标签：${Array.isArray(current_tags) ? current_tags.join('、') : '无'}`
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage },
+  ]
+
+  const startMs = Date.now()
+  let success = false
+  let errorMsg = null
+  let usage = null
+  let parsed = null
+
+  try {
+    const result = await createChatCompletion(messages, { temperature: 0.5, max_tokens: 1024 })
+    success = true
+    usage = result.usage
+    // 容错处理：模型可能在外层包裹 ```json 代码块，先剥离再解析
+    const raw = result.content || ''
+    const jsonStr = raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
+    parsed = JSON.parse(jsonStr)
+  } catch (e) {
+    errorMsg = String(e.message || e).slice(0, 500)
+  }
+
+  const latMs = Date.now() - startMs
+  const logId = `aul_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+  const promptTokens = usage?.prompt_tokens ?? 0
+  const completionTokens = usage?.completion_tokens ?? 0
+  const rawReq = truncateForLog(JSON.stringify({ content: content.slice(0, 200) }), 1000)
+
+  dbQuery(
+    `INSERT INTO ai_usage_logs (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, error_msg, raw_request_truncated, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+    [logId, userId, 'deepseek-chat', promptTokens, completionTokens, latMs, errorMsg, rawReq]
+  ).catch((err) => console.warn('[ai_usage_logs] 写入失败:', err.message))
+
+  if (success && parsed) {
+    return sendJson(res, 200, parsed)
+  }
+  return sendJson(res, 502, { error: errorMsg || 'AI 响应解析失败', from_llm: false })
+}
+
+/**
+ * AI 答疑启动：创建问题记录，检索相似帖子与知识库条目
+ * 不直接调用 LLM，仅做上下文准备；实际流式生成在 /ai/qa/stream
+ */
+async function handleAIQAStart(req, res, authUser) {
+  const userId = authUser.userId
+  const body = await readJsonBody(req)
+  const { content } = body
+  if (!content || typeof content !== 'string') {
+    return sendJson(res, 400, { error: '缺少必填字段：content' })
+  }
+
+  // 创建问题记录，状态置为 answering 表示生成中
+  const questionId = crypto.randomUUID()
+  await dbQuery(
+    `INSERT INTO questions (id, user_id, content, source_mode, status, created_at)
+     VALUES ($1, $2, $3, 'site_only', 'answering', NOW())`,
+    [questionId, userId, content]
+  )
+
+  // 相似帖子检索：标题 / 摘要 / 正文三字段任一命中即召回
+  let similarPosts = []
+  try {
+    const { rows } = await dbQuery(
+      `SELECT id, title, summary FROM posts
+       WHERE status='published'
+         AND (title ILIKE '%'||$1||'%' OR summary ILIKE '%'||$1||'%' OR content ILIKE '%'||$1||'%')
+       LIMIT 5`,
+      [content]
+    )
+    similarPosts = rows.map((r) => ({ id: r.id, title: r.title, summary: r.summary }))
+  } catch (err) {
+    // posts 表查询失败不阻断流程，降级为空列表
+    console.warn('[qa/start] 相似帖子查询失败:', err.message)
+  }
+
+  // 知识库检索：失败降级，避免知识库表缺失导致整个接口 500
+  let knowledgeItems = []
+  try {
+    const { rows } = await dbQuery(
+      `SELECT id, title, content FROM knowledge_items
+       WHERE status='active'
+         AND (title ILIKE '%'||$1||'%' OR content ILIKE '%'||$1||'%')
+       LIMIT 3`,
+      [content]
+    )
+    knowledgeItems = rows.map((r) => ({ id: r.id, title: r.title, content: r.content }))
+  } catch (err) {
+    console.warn('[qa/start] 知识库查询失败:', err.message)
+  }
+
+  return sendJson(res, 200, {
+    question_id: questionId,
+    similar_posts: similarPosts,
+    knowledge_items: knowledgeItems,
+  })
+}
+
+/**
+ * AI 答疑流式生成：SSE 推送回答片段，结束后写 ai_answers / source_citations
+ * 敏感话题检测：回答包含 [敏感问题] 标记则 safety_label='sensitive'
+ */
+async function handleAIQAStream(req, res, authUser) {
+  const userId = authUser.userId
+  const rate = await aiRateLimit(userId)
+  if (!rate.ok) {
+    return sendJson(res, 429, { error: 'AI 调用过于频繁，请稍后再试' })
+  }
+
+  const body = await readJsonBody(req)
+  const { question_id } = body
+  if (!question_id) {
+    return sendJson(res, 400, { error: '缺少必填字段：question_id' })
+  }
+
+  // 回查问题记录拿到原文，重新检索上下文（questions 表未存储检索结果）
+  const { rows: qRows } = await dbQuery(
+    `SELECT id, content FROM questions WHERE id = $1`,
+    [question_id]
+  )
+  if (qRows.length === 0) {
+    return sendJson(res, 404, { error: '问题不存在' })
+  }
+  const question = qRows[0]
+
+  // 重新检索相似帖子，作为 LLM 上下文与后续引用来源
+  let similarPosts = []
+  try {
+    const { rows } = await dbQuery(
+      `SELECT id, title, summary FROM posts
+       WHERE status='published'
+         AND (title ILIKE '%'||$1||'%' OR summary ILIKE '%'||$1||'%' OR content ILIKE '%'||$1||'%')
+       LIMIT 5`,
+      [question.content]
+    )
+    similarPosts = rows.map((r) => ({ id: r.id, title: r.title, summary: r.summary }))
+  } catch (err) {
+    console.warn('[qa/stream] 相似帖子查询失败:', err.message)
+  }
+
+  let knowledgeItems = []
+  try {
+    const { rows } = await dbQuery(
+      `SELECT id, title, content FROM knowledge_items
+       WHERE status='active'
+         AND (title ILIKE '%'||$1||'%' OR content ILIKE '%'||$1||'%')
+       LIMIT 3`,
+      [question.content]
+    )
+    knowledgeItems = rows.map((r) => ({ id: r.id, title: r.title, content: r.content }))
+  } catch (err) {
+    console.warn('[qa/stream] 知识库查询失败:', err.message)
+  }
+
+  // 拼装上下文：把相似帖子与知识库条目作为参考资料喂给模型
+  const postContext = similarPosts.length > 0
+    ? similarPosts.map((p, i) => `帖子${i + 1}《${p.title}》：${p.summary || ''}`).join('\n')
+    : '（暂无相关帖子）'
+  const knowledgeContext = knowledgeItems.length > 0
+    ? knowledgeItems.map((k, i) => `知识${i + 1}《${k.title}》：${(k.content || '').slice(0, 200)}`).join('\n')
+    : '（暂无相关知识）'
+
+  const systemPrompt = `你是一个论坛AI助手。请回答用户的问题。
+规则：
+1. 如果问题涉及医疗、法律、投资、政治、人身安全等敏感话题，在回答开头标注[敏感问题]并附上"以上信息仅供参考，请咨询专业渠道获取准确建议"
+2. 引用站内帖子时请注明来源
+3. 不得输出绝对结论
+4. 以下是站内相关帖子供参考：
+${postContext}
+
+以下是知识库相关条目供参考：
+${knowledgeContext}`
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: question.content },
+  ]
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  })
+
+  const startMs = Date.now()
+  let success = false
+  let errorMsg = null
+  let usage = null
+  let fullAnswer = ''
+  const logId = `aul_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+  const rawReq = truncateForLog(JSON.stringify({ question_id }), 1000)
+
+  function writeUsageLog() {
+    const latMs = Date.now() - startMs
+    const promptTokens = usage?.prompt_tokens ?? 0
+    const completionTokens = usage?.completion_tokens ?? 0
+    dbQuery(
+      `INSERT INTO ai_usage_logs (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, error_msg, raw_request_truncated, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      [logId, userId, 'deepseek-chat', promptTokens, completionTokens, latMs, errorMsg, rawReq]
+    ).catch((err) => console.warn('[ai_usage_logs] 写入失败:', err.message))
+  }
+
+  try {
+    await streamChatCompletion(
+      messages,
+      { temperature: 0.7, max_tokens: 1024 },
+      (text) => {
+        fullAnswer += text
+        res.write(`data: ${JSON.stringify({ content: text })}\n\n`)
+      },
+      (finalText, finalUsage) => {
+        // onDone 给出权威完整文本，覆盖累加值避免丢字符；DB 写入延后到 await 完成后执行
+        fullAnswer = finalText
+        usage = finalUsage
+      }
+    )
+
+    // 流式完成，开始落库
+    success = true
+    const safetyLabel = fullAnswer.includes('[敏感问题]') ? 'sensitive' : 'normal'
+    const answerId = crypto.randomUUID()
+    const citationIds = similarPosts.map((p) => p.id)
+
+    try {
+      await dbQuery(
+        `INSERT INTO ai_answers (id, question_id, content, safety_label, citation_ids, generated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        [answerId, question_id, fullAnswer, safetyLabel, citationIds]
+      )
+      // 为每个相似帖子写入引用来源明细
+      for (const post of similarPosts) {
+        await dbQuery(
+          `INSERT INTO source_citations (id, answer_id, source_type, source_id, title, excerpt, created_at)
+           VALUES ($1, $2, 'post', $3, $4, $5, NOW())`,
+          [crypto.randomUUID(), answerId, post.id, post.title, post.summary]
+        )
+      }
+      // 更新问题状态为已回答
+      await dbQuery(`UPDATE questions SET status='answered' WHERE id=$1`, [question_id])
+    } catch (err) {
+      console.warn('[qa/stream] 落库失败:', err.message)
+    }
+
+    writeUsageLog()
+    res.write(`data: ${JSON.stringify({ done: true, safety_label: safetyLabel, question_id })}\n\n`)
+    res.end()
+  } catch (e) {
+    errorMsg = String(e.message || e).slice(0, 500)
+    writeUsageLog()
+    res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`)
+    res.write(`data: ${JSON.stringify({ done: true, safety_label: 'normal', question_id })}\n\n`)
+    res.end()
+  }
+
+  return true
+}
+
+/**
+ * 知识库列表：支持按 title 模糊搜索，排除已归档条目
+ */
+async function handleAdminListKnowledge(req, res, authUser, url) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const search = url?.searchParams?.get('search') || null
+  const { rows } = await dbQuery(
+    `SELECT id, title, content, tags, status, updated_at
+     FROM knowledge_items
+     WHERE status != 'archived'
+       AND ($1::text IS NULL OR title ILIKE '%'||$1||'%')
+     ORDER BY updated_at DESC`,
+    [search]
+  )
+  return sendJson(res, 200, rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    content: r.content,
+    tags: r.tags || [],
+    status: r.status,
+    updatedAt: toISO(r.updated_at),
+  })))
+}
+
+/**
+ * 知识库新增：id 用 crypto.randomUUID 生成，记录最近维护人
+ */
+async function handleAdminCreateKnowledge(req, res, authUser) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const body = await readJsonBody(req)
+  const { title, content, tags } = body
+  if (!title) {
+    return sendJson(res, 400, { error: '缺少必填字段：title' })
+  }
+  const id = crypto.randomUUID()
+  const tagArr = Array.isArray(tags) ? tags : []
+  await dbQuery(
+    `INSERT INTO knowledge_items (id, title, content, tags, status, updated_by, updated_at, created_at)
+     VALUES ($1, $2, $3, $4, 'active', $5, NOW(), NOW())`,
+    [id, title, content || null, tagArr, authUser.userId]
+  )
+  return sendJson(res, 201, { id, title, content: content || null, tags: tagArr, status: 'active' })
+}
+
+/**
+ * 知识库编辑：更新标题 / 正文 / 标签，刷新 updated_at
+ */
+async function handleAdminUpdateKnowledge(req, res, authUser, id) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const body = await readJsonBody(req)
+  const { title, content, tags } = body
+  const tagArr = Array.isArray(tags) ? tags : []
+  const { rowCount } = await dbQuery(
+    `UPDATE knowledge_items
+     SET title=$1, content=$2, tags=$3, updated_by=$4, updated_at=NOW()
+     WHERE id=$5`,
+    [title, content, tagArr, authUser.userId, id]
+  )
+  if (rowCount === 0) {
+    return sendJson(res, 404, { error: '知识库条目不存在' })
+  }
+  return sendJson(res, 200, { id, title, content, tags: tagArr })
+}
+
+/**
+ * 知识库归档（软删除）：仅置 status='archived'，保留数据可恢复
+ */
+async function handleAdminDeleteKnowledge(req, res, authUser, id) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const { rowCount } = await dbQuery(
+    `UPDATE knowledge_items SET status='archived' WHERE id=$1`,
+    [id]
+  )
+  if (rowCount === 0) {
+    return sendJson(res, 404, { error: '知识库条目不存在' })
+  }
+  return sendJson(res, 200, { id, status: 'archived' })
+}
+
+/**
  * 启动时自动确保 Phase1 新增表存在（幂等）
  * 避免部署后忘记执行迁移脚本导致 guest_sessions / ai_usage_logs 缺表 → 500
  */
@@ -1289,6 +1744,478 @@ async function ensurePhase4Tables() {
     }
   }
   console.log('📦 Phase4 表自检完成')
+}
+
+// ======== Phase4：内容审核 / 举报 / 后台管理 ========
+
+/**
+ * 鉴权辅助：检查是否为管理员或版主
+ * roles 包含 admin / moderator / super_admin 任一即通过
+ */
+function requireAdminOrMod(authUser) {
+  if (!authUser || !Array.isArray(authUser.roles)) return false
+  return authUser.roles.some((r) => r === 'admin' || r === 'moderator' || r === 'super_admin')
+}
+
+/**
+ * 鉴权辅助：检查是否为管理员（仅 admin / super_admin）
+ * 用于用户管理与版块管理这类高权限操作
+ */
+function requireAdmin(authUser) {
+  if (!authUser || !Array.isArray(authUser.roles)) return false
+  return authUser.roles.some((r) => r === 'admin' || r === 'super_admin')
+}
+
+/**
+ * 失效指定用户在 Redis 中的全部 session（封禁/限制时调用，使 token 立即失效）
+ * 通过 SCAN 匹配 af:session:{userId}:* 后批量 DEL，避免阻塞
+ */
+async function invalidateUserSessions(userId) {
+  if (!redis || !isRedisConnected()) return
+  try {
+    const pattern = `af:session:${userId}:*`
+    let cursor = '0'
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+      if (keys.length > 0) {
+        await redis.del(...keys)
+      }
+      cursor = nextCursor
+    } while (cursor !== '0')
+  } catch (err) {
+    console.warn('[invalidateUserSessions] 失败:', err.message)
+  }
+}
+
+// ======== Task 16：审核队列 API ========
+
+/**
+ * 审核队列列表：支持 status / risk_level / board_id 筛选
+ * 按风险等级（high→medium→low→其他）排序，同级按创建时间倒序
+ * 同时回查每条 case 对应的目标内容（帖子标题或评论内容）用于后台展示
+ */
+async function handleListModeration(req, res, authUser, url) {
+  if (!requireAdminOrMod(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员或版主权限' })
+  }
+  const status = url.searchParams.get('status') || 'open'
+  const riskLevel = url.searchParams.get('risk_level')
+  const boardId = url.searchParams.get('board_id')
+
+  // 动态拼接 WHERE：status 必填，risk_level / board_id 可选
+  const params = [status]
+  let where = `WHERE mc.status = $1`
+  let idx = 2
+  if (riskLevel) {
+    where += ` AND mc.risk_level = $${idx++}`
+    params.push(riskLevel)
+  }
+  if (boardId) {
+    // board_id 不在 moderation_cases 表中，通过子查询关联 post 的 board_id（仅 post 类型 case 受影响）
+    where += ` AND EXISTS (SELECT 1 FROM posts p WHERE p.id = mc.target_id AND mc.target_type = 'post' AND p.board_id = $${idx++})`
+    params.push(boardId)
+  }
+
+  const { rows } = await dbQuery(
+    `SELECT mc.*, u.nickname AS reporter_name
+     FROM moderation_cases mc
+     LEFT JOIN users u ON mc.assignee_id = u.id
+     ${where}
+     ORDER BY CASE mc.risk_level WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END,
+              mc.created_at DESC
+     LIMIT 50`,
+    params
+  )
+
+  // 批量回查目标内容，避免 N+1：分别收集 post / comment 的 id
+  const postIds = rows.filter((r) => r.target_type === 'post').map((r) => r.target_id)
+  const commentIds = rows.filter((r) => r.target_type === 'comment').map((r) => r.target_id)
+  const postTitleMap = new Map()
+  const commentContentMap = new Map()
+  if (postIds.length > 0) {
+    const { rows: postRows } = await dbQuery(
+      `SELECT id, title FROM posts WHERE id = ANY($1::text[])`,
+      [postIds]
+    )
+    for (const r of postRows) postTitleMap.set(r.id, r.title)
+  }
+  if (commentIds.length > 0) {
+    const { rows: commentRows } = await dbQuery(
+      `SELECT id, content FROM comments WHERE id = ANY($1::text[])`,
+      [commentIds]
+    )
+    for (const r of commentRows) commentContentMap.set(r.id, r.content)
+  }
+
+  const result = rows.map((r) => ({
+    id: r.id,
+    targetType: r.target_type,
+    targetId: r.target_id,
+    source: r.source,
+    riskType: r.risk_type,
+    riskLevel: r.risk_level,
+    status: r.status,
+    assigneeId: r.assignee_id,
+    reporterName: r.reporter_name,
+    resolutionNote: r.resolution_note,
+    createdAt: toISO(r.created_at),
+    resolvedAt: toISO(r.resolved_at),
+    // 附加目标内容快照，便于后台直接展示而无需二次请求
+    targetContent:
+      r.target_type === 'post'
+        ? postTitleMap.get(r.target_id) || null
+        : commentContentMap.get(r.target_id) || null,
+  }))
+  return sendJson(res, 200, result)
+}
+
+/**
+ * 处理审核 case：approve / fold / delete
+ * - approve：仅标记 case 已解决，不改目标状态
+ * - fold：评论折叠（status='folded'）
+ * - delete：目标 status='removed'
+ */
+async function handleResolveModeration(req, res, authUser, id) {
+  if (!requireAdminOrMod(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员或版主权限' })
+  }
+  const body = await readJsonBody(req)
+  const { action, note } = body
+  if (!['approve', 'fold', 'delete'].includes(action)) {
+    return sendJson(res, 400, { error: 'action 必须为 approve / fold / delete' })
+  }
+
+  // 先查出 case 以拿到 target_type / target_id，决定后续目标状态变更
+  const { rows: caseRows } = await dbQuery(
+    `SELECT * FROM moderation_cases WHERE id = $1`,
+    [id]
+  )
+  if (caseRows.length === 0) {
+    return sendJson(res, 404, { error: '审核 case 不存在' })
+  }
+  const target = caseRows[0]
+
+  // 标记 case 已解决
+  await dbQuery(
+    `UPDATE moderation_cases SET status = 'resolved', resolution_note = $1, resolved_at = NOW() WHERE id = $2`,
+    [note || null, id]
+  )
+
+  // 根据动作变更目标状态
+  if (action === 'fold' && target.target_type === 'comment') {
+    await dbQuery(`UPDATE comments SET status = 'folded' WHERE id = $1`, [target.target_id])
+  } else if (action === 'delete') {
+    if (target.target_type === 'post') {
+      await dbQuery(`UPDATE posts SET status = 'removed' WHERE id = $1`, [target.target_id])
+    } else if (target.target_type === 'comment') {
+      await dbQuery(`UPDATE comments SET status = 'removed' WHERE id = $1`, [target.target_id])
+    }
+  }
+  // approve 不变更目标状态
+  return sendJson(res, 200, { ok: true })
+}
+
+// ======== Task 17：举报 API ========
+
+/**
+ * 创建举报：写入 reports 表，并同步创建 moderation_case 进入审核队列
+ */
+async function handleCreateReport(req, res, authUser) {
+  const body = await readJsonBody(req)
+  const { target_type, target_id, reason } = body
+  if (!target_type || !target_id || !reason) {
+    return sendJson(res, 400, { error: '缺少必填字段：target_type, target_id, reason' })
+  }
+  const reportId = crypto.randomUUID()
+  const caseId = crypto.randomUUID()
+  await dbQuery(
+    `INSERT INTO reports (id, reporter_id, target_type, target_id, reason, status, created_at)
+     VALUES ($1, $2, $3, $4, $5, 'pending', NOW())`,
+    [reportId, authUser.userId, target_type, target_id, reason]
+  )
+  // 同步进入审核队列，source='report' 区分来源
+  await dbQuery(
+    `INSERT INTO moderation_cases (id, target_type, target_id, source, risk_type, status, created_at)
+     VALUES ($1, $2, $3, 'report', $4, 'open', NOW())`,
+    [caseId, target_type, target_id, reason]
+  )
+  return sendJson(res, 201, { ok: true })
+}
+
+/**
+ * 举报列表：按创建时间倒序，最多 50 条
+ */
+async function handleListReports(req, res, authUser) {
+  if (!requireAdminOrMod(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员或版主权限' })
+  }
+  const { rows } = await dbQuery(
+    `SELECT r.*, u.nickname AS reporter_name
+     FROM reports r
+     LEFT JOIN users u ON r.reporter_id = u.id
+     ORDER BY r.created_at DESC
+     LIMIT 50`
+  )
+  const result = rows.map((r) => ({
+    id: r.id,
+    reporterId: r.reporter_id,
+    reporterName: r.reporter_name,
+    targetType: r.target_type,
+    targetId: r.target_id,
+    reason: r.reason,
+    status: r.status,
+    createdAt: toISO(r.created_at),
+  }))
+  return sendJson(res, 200, result)
+}
+
+/**
+ * 处理举报：reject / warn / delete / ban
+ * - reject：举报被驳回
+ * - warn：仅记录（标 resolved）
+ * - delete：删除被举报内容（status='removed'）
+ * - ban：封禁内容作者（查询目标找出 author_id 后 UPDATE users status='banned'）
+ */
+async function handleHandleReport(req, res, authUser, id) {
+  if (!requireAdminOrMod(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员或版主权限' })
+  }
+  const body = await readJsonBody(req)
+  const { action, note } = body
+  if (!['reject', 'warn', 'delete', 'ban'].includes(action)) {
+    return sendJson(res, 400, { error: 'action 必须为 reject / warn / delete / ban' })
+  }
+
+  const { rows: reportRows } = await dbQuery(`SELECT * FROM reports WHERE id = $1`, [id])
+  if (reportRows.length === 0) {
+    return sendJson(res, 404, { error: '举报记录不存在' })
+  }
+  const report = reportRows[0]
+
+  // reject → rejected，其余 → resolved
+  const newStatus = action === 'reject' ? 'rejected' : 'resolved'
+  await dbQuery(
+    `UPDATE reports SET status = $1 WHERE id = $2`,
+    [newStatus, id]
+  )
+
+  // delete：将目标内容标记为 removed
+  if (action === 'delete') {
+    if (report.target_type === 'post') {
+      await dbQuery(`UPDATE posts SET status = 'removed' WHERE id = $1`, [report.target_id])
+    } else if (report.target_type === 'comment') {
+      await dbQuery(`UPDATE comments SET status = 'removed' WHERE id = $1`, [report.target_id])
+    }
+  }
+
+  // ban：封禁内容作者（注意是作者，不是举报人）
+  if (action === 'ban') {
+    let authorId = null
+    if (report.target_type === 'post') {
+      const { rows } = await dbQuery(`SELECT author_id FROM posts WHERE id = $1`, [report.target_id])
+      authorId = rows[0]?.author_id || null
+    } else if (report.target_type === 'comment') {
+      const { rows } = await dbQuery(`SELECT author_id FROM comments WHERE id = $1`, [report.target_id])
+      authorId = rows[0]?.author_id || null
+    }
+    if (authorId) {
+      await dbQuery(`UPDATE users SET status = 'banned' WHERE id = $1`, [authorId])
+      // 失效该作者的所有 session，使其 token 立即失效
+      await invalidateUserSessions(authorId)
+    }
+  }
+
+  // note 暂存到 moderation_cases 关联记录（如有），此处仅记录到日志便于审计
+  if (note) {
+    console.log(`[report:${id}] action=${action} note=${note}`)
+  }
+  return sendJson(res, 200, { ok: true })
+}
+
+// ======== Task 18：用户管理 API ========
+
+/**
+ * 用户列表（后台）：支持 search 模糊搜索 + 分页
+ * 返回 { users, total } 便于前端分页展示
+ */
+async function handleAdminListUsers(req, res, authUser, url) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const search = url.searchParams.get('search') || null
+  const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10))
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10))
+
+  // $1::text IS NULL 让无 search 时跳过筛选；ILIKE 模糊匹配 nickname / email
+  const { rows } = await dbQuery(
+    `SELECT id, nickname, email, status, roles, created_at
+     FROM users
+     WHERE ($1::text IS NULL OR nickname ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%')
+     ORDER BY created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [search, limit, offset]
+  )
+  const { rows: countRows } = await dbQuery(
+    `SELECT COUNT(*)::int AS total
+     FROM users
+     WHERE ($1::text IS NULL OR nickname ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%')`,
+    [search]
+  )
+  const users = rows.map((r) => ({
+    id: r.id,
+    nickname: r.nickname,
+    email: r.email,
+    status: r.status,
+    roles: r.roles || [],
+    createdAt: toISO(r.created_at),
+  }))
+  return sendJson(res, 200, { users, total: countRows[0]?.total || 0 })
+}
+
+/**
+ * 更新用户状态：active / limited / banned
+ * 封禁时同步失效 Redis session，使该用户 token 立即失效
+ */
+async function handleAdminUpdateUserStatus(req, res, authUser, id) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const body = await readJsonBody(req)
+  const { status } = body
+  if (!['active', 'limited', 'banned'].includes(status)) {
+    return sendJson(res, 400, { error: 'status 必须为 active / limited / banned' })
+  }
+  await dbQuery(`UPDATE users SET status = $1, updated_at = NOW() WHERE id = $2`, [status, id])
+  // 封禁时清空所有 session，强制下线
+  if (status === 'banned') {
+    await invalidateUserSessions(id)
+  }
+  // 清除用户相关缓存
+  await cacheDel(userKey(id))
+  await cacheDel(userListKey())
+  return sendJson(res, 200, { ok: true })
+}
+
+/**
+ * 更新用户角色：roles 为字符串数组
+ * 使用 $1::text[] 显式类型，兼容 PostgreSQL 严格模式
+ */
+async function handleAdminUpdateUserRoles(req, res, authUser, id) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const body = await readJsonBody(req)
+  const { roles } = body
+  if (!Array.isArray(roles)) {
+    return sendJson(res, 400, { error: 'roles 必须为字符串数组' })
+  }
+  await dbQuery(
+    `UPDATE users SET roles = $1::text[], updated_at = NOW() WHERE id = $2`,
+    [roles, id]
+  )
+  await cacheDel(userKey(id))
+  await cacheDel(userListKey())
+  return sendJson(res, 200, { ok: true })
+}
+
+// ======== Task 19：版块管理 API ========
+
+/**
+ * 创建版块：id 用 UUID，status 默认 'active'
+ * 创建后失效版块列表缓存
+ */
+async function handleAdminCreateBoard(req, res, authUser) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const body = await readJsonBody(req)
+  const { name, description, icon, color, governance_mode } = body
+  if (!name) {
+    return sendJson(res, 400, { error: '缺少必填字段：name' })
+  }
+  const id = crypto.randomUUID()
+  await dbQuery(
+    `INSERT INTO boards (id, name, description, icon, color, governance_mode, status)
+     VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
+    [id, name, description || null, icon || null, color || null, governance_mode || 'open']
+  )
+  await cacheDel(boardListKey())
+  return sendJson(res, 201, { id, ok: true })
+}
+
+/**
+ * 编辑版块：仅更新提供的字段（动态拼接 SET 子句）
+ */
+async function handleAdminEditBoard(req, res, authUser, id) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  const body = await readJsonBody(req)
+  const allowedFields = ['name', 'description', 'icon', 'color', 'governance_mode']
+  const setClauses = []
+  const params = []
+  for (const field of allowedFields) {
+    if (body[field] !== undefined) {
+      params.push(body[field])
+      setClauses.push(`${field} = $${params.length}`)
+    }
+  }
+  if (setClauses.length === 0) {
+    return sendJson(res, 400, { error: '未提供任何可更新字段' })
+  }
+  params.push(id)
+  await dbQuery(
+    `UPDATE boards SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
+    params
+  )
+  await cacheDel(boardListKey())
+  return sendJson(res, 200, { ok: true })
+}
+
+/**
+ * 归档版块：软删除，status='archived'（不在列表展示，但保留数据）
+ */
+async function handleAdminArchiveBoard(req, res, authUser, id) {
+  if (!requireAdmin(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员权限' })
+  }
+  await dbQuery(`UPDATE boards SET status = 'archived' WHERE id = $1`, [id])
+  await cacheDel(boardListKey())
+  return sendJson(res, 200, { ok: true })
+}
+
+// ======== Task 20：后台总览 API ========
+
+/**
+ * 后台总览：6 个 COUNT 查询并行执行，返回关键运营指标
+ */
+async function handleAdminDashboard(req, res, authUser) {
+  if (!requireAdminOrMod(authUser)) {
+    return sendJson(res, 403, { error: '需要管理员或版主权限' })
+  }
+  const [
+    usersRes,
+    postsRes,
+    commentsRes,
+    moderationRes,
+    todayUsersRes,
+    todayPostsRes,
+  ] = await Promise.all([
+    dbQuery(`SELECT COUNT(*)::int AS cnt FROM users WHERE status != 'deleted'`),
+    dbQuery(`SELECT COUNT(*)::int AS cnt FROM posts WHERE status = 'published'`),
+    dbQuery(`SELECT COUNT(*)::int AS cnt FROM comments WHERE status = 'published'`),
+    dbQuery(`SELECT COUNT(*)::int AS cnt FROM moderation_cases WHERE status = 'open'`),
+    dbQuery(`SELECT COUNT(*)::int AS cnt FROM users WHERE created_at >= CURRENT_DATE`),
+    dbQuery(`SELECT COUNT(*)::int AS cnt FROM posts WHERE created_at >= CURRENT_DATE`),
+  ])
+  return sendJson(res, 200, {
+    total_users: usersRes.rows[0]?.cnt || 0,
+    total_posts: postsRes.rows[0]?.cnt || 0,
+    total_comments: commentsRes.rows[0]?.cnt || 0,
+    pending_moderation: moderationRes.rows[0]?.cnt || 0,
+    today_new_users: todayUsersRes.rows[0]?.cnt || 0,
+    today_new_posts: todayPostsRes.rows[0]?.cnt || 0,
+  })
 }
 
 async function handleGuestStart(req, res) {
@@ -1846,6 +2773,11 @@ async function matchForumRoute(req, res, pathname, method, url) {
       supportedMethods.push('GET')
       if (method === 'GET') return await handleSearchSummary(req, res, url)
     }
+    // 举报提交：需要登录
+    if (sub === '/reports') {
+      supportedMethods.push('POST')
+      if (method === 'POST') return await requireAuth(handleCreateReport)(req, res)
+    }
 
     // === 认证路由 ===
     if (sub === '/auth/login') {
@@ -1947,6 +2879,22 @@ async function matchForumRoute(req, res, pathname, method, url) {
         supportedMethods.push('POST')
         if (method === 'POST') return await requireAuth(handleAIStream)(req, res)
       }
+      // AI 发帖辅助：分析草稿返回标题/标签/润色建议
+      if (parts[1] === 'post-assist') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleAIPostAssist)(req, res)
+      }
+      // AI 答疑：/ai/qa/start 启动提问、/ai/qa/stream 流式生成回答
+      if (parts[1] === 'qa' && parts.length >= 3) {
+        if (parts[2] === 'start') {
+          supportedMethods.push('POST')
+          if (method === 'POST') return await requireAuth(handleAIQAStart)(req, res)
+        }
+        if (parts[2] === 'stream') {
+          supportedMethods.push('POST')
+          if (method === 'POST') return await requireAuth(handleAIQAStream)(req, res)
+        }
+      }
     }
 
     if (parts[0] === 'guest' && parts.length >= 2) {
@@ -1961,6 +2909,81 @@ async function matchForumRoute(req, res, pathname, method, url) {
       if (parts[1] === 'bind') {
         supportedMethods.push('POST')
         if (method === 'POST') return await requireAuth(handleGuestBind)(req, res)
+      }
+    }
+
+    // 管理员知识库管理：CRUD，均需管理员角色（handler 内通过 requireAdmin 校验）
+    if (parts[0] === 'admin' && parts.length >= 2 && parts[1] === 'knowledge') {
+      if (parts.length === 2) {
+        supportedMethods.push('GET', 'POST')
+        if (method === 'GET') return await requireAuth(handleAdminListKnowledge)(req, res, url)
+        if (method === 'POST') return await requireAuth(handleAdminCreateKnowledge)(req, res)
+      }
+      if (parts.length === 3) {
+        const kid = decodeURIComponent(parts[2])
+        supportedMethods.push('PUT', 'DELETE')
+        if (method === 'PUT') return await requireAuth(handleAdminUpdateKnowledge)(req, res, kid)
+        if (method === 'DELETE') return await requireAuth(handleAdminDeleteKnowledge)(req, res, kid)
+      }
+    }
+
+    // ======== Phase4：审核 / 举报 / 用户 / 版块 / 总览 ========
+    if (parts[0] === 'admin' && parts.length >= 2) {
+      // GET /api/forum/admin/moderation —— 审核队列列表（admin/mod）
+      if (parts[1] === 'moderation' && parts.length === 2) {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await requireAuth(handleListModeration)(req, res, url)
+      }
+      // POST /api/forum/admin/moderation/:id/resolve —— 处理审核 case（admin/mod）
+      if (parts[1] === 'moderation' && parts.length === 4 && parts[3] === 'resolve') {
+        supportedMethods.push('POST')
+        const mid = decodeURIComponent(parts[2])
+        if (method === 'POST') return await requireAuth(handleResolveModeration)(req, res, mid)
+      }
+      // GET /api/forum/admin/reports —— 举报列表（admin/mod）
+      if (parts[1] === 'reports' && parts.length === 2) {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await requireAuth(handleListReports)(req, res)
+      }
+      // POST /api/forum/admin/reports/:id/handle —— 处理举报（admin/mod）
+      if (parts[1] === 'reports' && parts.length === 4 && parts[3] === 'handle') {
+        supportedMethods.push('POST')
+        const rid = decodeURIComponent(parts[2])
+        if (method === 'POST') return await requireAuth(handleHandleReport)(req, res, rid)
+      }
+      // GET /api/forum/admin/users —— 用户列表（admin）
+      if (parts[1] === 'users' && parts.length === 2) {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await requireAuth(handleAdminListUsers)(req, res, url)
+      }
+      // PUT /api/forum/admin/users/:id/status | /roles —— 更新用户状态/角色（admin）
+      if (parts[1] === 'users' && parts.length === 4) {
+        const uid = decodeURIComponent(parts[2])
+        if (parts[3] === 'status') {
+          supportedMethods.push('PUT')
+          if (method === 'PUT') return await requireAuth(handleAdminUpdateUserStatus)(req, res, uid)
+        }
+        if (parts[3] === 'roles') {
+          supportedMethods.push('PUT')
+          if (method === 'PUT') return await requireAuth(handleAdminUpdateUserRoles)(req, res, uid)
+        }
+      }
+      // GET /api/forum/admin/dashboard —— 后台总览（admin/mod）
+      if (parts[1] === 'dashboard' && parts.length === 2) {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await requireAuth(handleAdminDashboard)(req, res)
+      }
+      // POST /api/forum/admin/boards —— 创建版块（admin）
+      if (parts[1] === 'boards' && parts.length === 2) {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleAdminCreateBoard)(req, res)
+      }
+      // PUT /api/forum/admin/boards/:id —— 编辑版块；DELETE —— 归档版块（admin）
+      if (parts[1] === 'boards' && parts.length === 3) {
+        const bid = decodeURIComponent(parts[2])
+        supportedMethods.push('PUT', 'DELETE')
+        if (method === 'PUT') return await requireAuth(handleAdminEditBoard)(req, res, bid)
+        if (method === 'DELETE') return await requireAuth(handleAdminArchiveBoard)(req, res, bid)
       }
     }
 

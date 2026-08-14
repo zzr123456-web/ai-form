@@ -8,10 +8,11 @@ import Avatar from '../../components/ai-forum/common/Avatar.jsx'
 import TagPill from '../../components/ai-forum/common/TagPill.jsx'
 import EmptyState from '../../components/ai-forum/common/EmptyState.jsx'
 import CommentThread from '../../components/ai-forum/common/CommentThread.jsx'
+import ReportDialog from '../../components/ai-forum/common/ReportDialog.jsx'
 import AISummaryCard from '../../components/ai-forum/ai/AISummaryCard.jsx'
 import { useAuth } from '../../components/ai-forum/AuthProvider.jsx'
 import {
-  getPost, getComments, getPosts,
+  getPost, getComments,
   getInteractions, togglePostLike, togglePostFavorite, createComment, toggleCommentLike,
 } from '../../utils/ai-forum/apiClient.js'
 import { formatRelativeTime, formatNumber } from '../../utils/ai-forum/aiForumUtils.js'
@@ -25,6 +26,8 @@ export default function PostDetailPage() {
   const [post, setPost] = useState(null)
   const [comments, setComments] = useState([])
   const [relatedPosts, setRelatedPosts] = useState([])
+  // 相关推荐独立 loading：主帖渲染后用骨架屏占位，专用端点返回后填充
+  const [relatedLoading, setRelatedLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -36,6 +39,8 @@ export default function PostDetailPage() {
   const [likedCommentIds, setLikedCommentIds] = useState([])
   // 评论提交 / 点赞提交 loading，避免重复触发
   const [submittingComment, setSubmittingComment] = useState(false)
+  // 举报弹窗显示状态：点击举报按钮时打开 ReportDialog
+  const [showReportDialog, setShowReportDialog] = useState(false)
 
   // ====== 数据加载：postId 变化时重新拉取帖子 + 评论 + 互动状态 ======
   // cancelled 标志防止快速切换路由时旧请求覆盖新状态（组件已卸载仍 setState）
@@ -48,6 +53,7 @@ export default function PostDetailPage() {
       setPost(null)
       setComments([])
       setRelatedPosts([])
+      setRelatedLoading(true)
       setLiked(false)
       setFavored(false)
       setLikedCommentIds([])
@@ -84,16 +90,33 @@ export default function PostDetailPage() {
       }
       setLoading(false)
 
-      // 相关推荐：best-effort 加载，失败不影响主流程
-      // 基于第一个 tag 查询同标签帖子，过滤当前帖后取前 5 条
-      if (postData.tags?.length > 0) {
-        const related = await getPosts({ tag: postData.tags[0], limit: 6 })
+      // 相关推荐：走专用端点 GET /posts/:id/related，best-effort 加载，失败不影响主流程
+      // 不依赖 apiClient.js（避免与并行更新冲突），inline fetch 复用同一鉴权模式
+      try {
+        let token = null
+        try { token = localStorage.getItem('af_token') } catch { token = null }
+        const headers = {}
+        if (token) headers.Authorization = `Bearer ${token}`
+        const relRes = await fetch(`/api/forum/posts/${id}/related`, { headers })
         if (cancelled) return
-        setRelatedPosts(
-          (Array.isArray(related) ? related : [])
-            .filter((p) => p.id !== id)
-            .slice(0, 5)
-        )
+        if (relRes.ok) {
+          const relText = await relRes.text()
+          let relData = null
+          try { relData = relText ? JSON.parse(relText) : null } catch { relData = null }
+          // 兼容数组 / {items} 两种返回形态
+          let relList = []
+          if (Array.isArray(relData)) relList = relData
+          else if (relData && Array.isArray(relData.items)) relList = relData.items
+          // 过滤当前帖，最多展示 5 条
+          setRelatedPosts(relList.filter((p) => p.id !== id).slice(0, 5))
+        } else {
+          setRelatedPosts([])
+        }
+      } catch {
+        setRelatedPosts([])
+      } finally {
+        // cancelled 时跳过，避免覆盖新请求的 loading 状态
+        if (!cancelled) setRelatedLoading(false)
       }
     }
 
@@ -168,10 +191,10 @@ export default function PostDetailPage() {
     }
   }
 
-  /** 举报：未登录拦截，已登录弹出提示（运营后台工单 Phase2 接入） */
+  /** 举报：未登录拦截，已登录打开举报弹窗 */
   const handleFlag = () => {
     if (!requireAuth('登录后举报')) return
-    alert('举报已提交，运营会尽快处理')
+    setShowReportDialog(true)
   }
 
   /** 分享：占位实现，Phase2 接入复制到剪贴板 */
@@ -505,34 +528,35 @@ export default function PostDetailPage() {
               />
             )}
           </section>
-        </div>
 
-        {/* ====== 右栏：4/12，<1024px grid 自动堆叠至评论区下方 ====== */}
-        <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-20 lg:self-start">
-          {/* AI 讨论总结卡 */}
-          <div className="mb-4">
-            <AISummaryCard />
-          </div>
-
-          {/* 相关推荐卡 */}
-          <div className="bg-card border border-border rounded-af-lg p-5">
+          {/* ========== c) 相关推荐（专用端点 + 骨架屏）========== */}
+          <section className="bg-card border border-border rounded-af-xl p-5 sm:p-6">
             <h2 className="font-semibold text-foreground mb-4">相关推荐</h2>
 
-            {Boolean(relatedPosts.length) ? (
-              <div className="space-y-4">
+            {relatedLoading ? (
+              // 骨架屏：5 条占位卡片，避免内容加载时布局跳动
+              <div className="space-y-3">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="animate-pulse rounded-af-md border border-border p-3">
+                    <div className="h-4 w-3/4 bg-afmuted/40 rounded mb-2" />
+                    <div className="h-3 w-1/3 bg-afmuted/30 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : Boolean(relatedPosts.length) ? (
+              <div className="space-y-3">
                 {relatedPosts.map((rp) => {
                   // 相关推荐作者信息从嵌套 author 取
                   const rpAuthor = rp.author
                   return (
-                    // 使用 onClick navigate 而非 to prop，符合 checklist 要求
                     <button
                       key={rp.id}
                       type="button"
                       onClick={() => navigate(`/forum/post/${rp.id}`)}
-                      className="group block w-full text-left"
+                      className="group block w-full text-left rounded-af-md border border-border p-3 hover:border-afmuted-foreground/40 hover:bg-afmuted/30 transition-colors"
                     >
-                      {/* 标题 2 行截断 */}
-                      <h3 className="text-sm font-medium text-foreground group-hover:text-afmuted-foreground transition-colors mb-2 line-clamp-2 leading-snug">
+                      {/* 标题 1 行截断，紧凑卡片样式 */}
+                      <h3 className="text-sm font-medium text-foreground group-hover:text-afmuted-foreground transition-colors mb-1.5 line-clamp-1 leading-snug">
                         {rp.title}
                       </h3>
                       <div className="flex items-center gap-2 text-xs text-afmuted-foreground">
@@ -547,15 +571,28 @@ export default function PostDetailPage() {
                 })}
               </div>
             ) : (
-              <EmptyState
-                icon={MessageCircle}
-                title="暂无相关推荐"
-                description="后续会补充更多相似帖子"
-              />
+              <p className="text-sm text-afmuted-foreground text-center py-4">暂无相关推荐</p>
             )}
+          </section>
+        </div>
+
+        {/* ====== 右栏：4/12，<1024px grid 自动堆叠至评论区下方 ====== */}
+        <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-20 lg:self-start">
+          {/* AI 讨论总结卡 */}
+          <div className="mb-4">
+            <AISummaryCard />
           </div>
         </aside>
       </div>
+
+      {/* 举报弹窗：showReportDialog 为 true 时渲染 */}
+      {showReportDialog ? (
+        <ReportDialog
+          target_type="post"
+          target_id={id}
+          onClose={() => setShowReportDialog(false)}
+        />
+      ) : null}
     </div>
   )
 }

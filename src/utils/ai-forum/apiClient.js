@@ -603,6 +603,371 @@ export async function getHealth() {
   return res.ok ? res.data : null
 }
 
+// === Phase 2：AI 发帖助手 / 答疑 / 搜索摘要 / 相关帖 ===
+
+/**
+ * AI 发帖助手：根据正文生成标题候选、推荐标签、润色正文
+ * @param {Object} data
+ * @param {string} data.content 当前正文
+ * @param {string} [data.board_id] 当前版块 id
+ * @param {Array<string>} [data.current_tags] 当前已选标签
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function aiPostAssist(data = {}) {
+  const res = await request('POST', '/ai/post-assist', undefined, {
+    content: data.content,
+    board_id: data.board_id,
+    current_tags: data.current_tags,
+  })
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * AI 答疑启动：提交问题，返回 question_id 与相似帖（作为引用来源）
+ * @param {string} content 问题文本
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function aiQAStart(content) {
+  if (!content || !content.trim()) {
+    return { ok: false, data: null, error: '问题内容不能为空' }
+  }
+  const res = await request('POST', '/ai/qa/start', undefined, { content })
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * AI 答疑流式回答：通过 SSE 逐块接收答案
+ * 解析 `data: {"content":"..."}` 行，每收到一段 content 调用 onChunk
+ * 流结束或收到 [DONE] 时 resolve；若结束事件携带元数据（如 safety_label）则作为返回值
+ * @param {string} questionId aiQAStart 返回的问题 id
+ * @param {(chunk:string)=>void} onChunk 每段内容回调
+ * @returns {Promise<Object|null>} 结束事件的元数据（无则 null）
+ */
+export async function aiQAStream(questionId, onChunk) {
+  if (!questionId) throw new Error('缺少 questionId')
+
+  const token = getToken()
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'text/event-stream',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(`${BASE_URL}/ai/qa/stream`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ question_id: questionId }),
+  })
+
+  if (!res.ok) {
+    let errMsg = `HTTP ${res.status}`
+    try {
+      const raw = await res.text()
+      try {
+        const json = JSON.parse(raw)
+        if (json && json.error) errMsg = json.error
+      } catch {}
+    } catch {}
+    throw new Error(errMsg)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  let finalMeta = null
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      let boundary
+      // SSE 以空行（\n\n）分隔事件段
+      while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+        const rawSegment = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+        const lines = rawSegment.split('\n')
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue
+          const dataStr = line.slice(5).trim()
+          if (!dataStr) continue
+          if (dataStr === '[DONE]') return finalMeta
+          try {
+            const parsed = JSON.parse(dataStr)
+            if (parsed && typeof parsed.content === 'string' && onChunk) {
+              onChunk(parsed.content)
+            }
+            // 捕获结束事件携带的元数据（safety_label 等），流真正结束时一并返回
+            if (parsed && (parsed.done === true || parsed.event === 'done' || parsed.type === 'done')) {
+              finalMeta = parsed
+            }
+          } catch {
+            // 单行解析失败跳过，不中断整条流
+          }
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock()
+    } catch {}
+  }
+  return finalMeta
+}
+
+/**
+ * 搜索摘要：为搜索关键词生成 AI 摘要
+ * @param {string} q 关键词
+ * @returns {Promise<Object|null>} 摘要对象，失败返回 null
+ */
+export async function searchSummary(q) {
+  if (!q) return null
+  const res = await request('GET', '/search/summary', { q })
+  return res.ok ? res.data : null
+}
+
+/**
+ * 获取指定帖子的相关帖推荐
+ * @param {string} postId 帖子 id
+ * @returns {Promise<Array>} 相关帖数组，失败返回 []
+ */
+export async function getRelatedPosts(postId) {
+  if (!postId) return []
+  const res = await request('GET', `/posts/${postId}/related`)
+  if (Array.isArray(res.data)) return res.data
+  if (res.data && Array.isArray(res.data.items)) return res.data.items
+  return []
+}
+
+// === 知识库管理（管理员） ===
+
+/**
+ * 获取知识库条目列表
+ * @param {string} [search] 搜索关键词
+ * @returns {Promise<Array>} 知识条目数组，失败返回 []
+ */
+export async function getKnowledgeItems(search) {
+  const params = {}
+  if (search !== undefined && search !== null) params.search = search
+  const res = await request('GET', '/admin/knowledge', params)
+  if (Array.isArray(res.data)) return res.data
+  if (res.data && Array.isArray(res.data.items)) return res.data.items
+  return []
+}
+
+/**
+ * 新建知识库条目
+ * @param {Object} data 条目数据
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function createKnowledge(data = {}) {
+  const res = await request('POST', '/admin/knowledge', undefined, data)
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * 更新知识库条目
+ * @param {string} id 条目 id
+ * @param {Object} data 待更新字段
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function updateKnowledge(id, data = {}) {
+  if (!id) return { ok: false, data: null, error: '缺少 id' }
+  const res = await request('PUT', `/admin/knowledge/${id}`, undefined, data)
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * 归档（删除）知识库条目
+ * @param {string} id 条目 id
+ * @returns {Promise<{ok:boolean, error:string|null}>}
+ */
+export async function archiveKnowledge(id) {
+  if (!id) return { ok: false, error: '缺少 id' }
+  const res = await request('DELETE', `/admin/knowledge/${id}`)
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, error: null }
+}
+
+// === 内容审核（管理员） ===
+
+/**
+ * 获取审核队列列表
+ * @param {Object} [filters] 筛选条件 { status, risk_level }
+ * @returns {Promise<Array>} 审核项数组，失败返回 []
+ */
+export async function getModerationList(filters = {}) {
+  const res = await request('GET', '/admin/moderation', {
+    status: filters.status,
+    risk_level: filters.risk_level,
+  })
+  if (Array.isArray(res.data)) return res.data
+  if (res.data && Array.isArray(res.data.items)) return res.data.items
+  return []
+}
+
+/**
+ * 处理审核项（通过/驳回等）
+ * @param {string} id 审核 id
+ * @param {string} action 处理动作
+ * @param {string} [note] 处理备注
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function resolveModeration(id, action, note) {
+  if (!id) return { ok: false, data: null, error: '缺少 id' }
+  const res = await request('POST', `/admin/moderation/${id}/resolve`, undefined, {
+    action,
+    note,
+  })
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+// === 举报 ===
+
+/**
+ * 创建举报
+ * @param {Object} data { target_type, target_id, reason }
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function createReport(data = {}) {
+  const res = await request('POST', '/reports', undefined, {
+    target_type: data.target_type,
+    target_id: data.target_id,
+    reason: data.reason,
+  })
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * 获取举报列表（管理员）
+ * @returns {Promise<Array>} 举报数组，失败返回 []
+ */
+export async function getReportList() {
+  const res = await request('GET', '/admin/reports')
+  if (Array.isArray(res.data)) return res.data
+  if (res.data && Array.isArray(res.data.items)) return res.data.items
+  return []
+}
+
+/**
+ * 处理举报
+ * @param {string} id 举报 id
+ * @param {string} action 处理动作
+ * @param {string} [note] 处理备注
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function handleReport(id, action, note) {
+  if (!id) return { ok: false, data: null, error: '缺少 id' }
+  const res = await request('POST', `/admin/reports/${id}/handle`, undefined, {
+    action,
+    note,
+  })
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+// === 管理员：用户管理 ===
+
+/**
+ * 获取用户列表（管理员）
+ * @param {string} [search] 搜索关键词
+ * @param {number} [limit] 每页数量
+ * @param {number} [offset] 偏移量
+ * @returns {Promise<Array>} 用户数组，失败返回 []
+ */
+export async function getAdminUsers(search, limit, offset) {
+  const params = {}
+  if (search !== undefined && search !== null) params.search = search
+  if (limit !== undefined && limit !== null) params.limit = limit
+  if (offset !== undefined && offset !== null) params.offset = offset
+  const res = await request('GET', '/admin/users', params)
+  if (Array.isArray(res.data)) return res.data
+  if (res.data && Array.isArray(res.data.items)) return res.data.items
+  return []
+}
+
+/**
+ * 更新用户状态（封禁/解封等）
+ * @param {string} id 用户 id
+ * @param {string} status 目标状态
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function updateUserStatus(id, status) {
+  if (!id) return { ok: false, data: null, error: '缺少 id' }
+  const res = await request('PUT', `/admin/users/${id}/status`, undefined, { status })
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * 更新用户角色
+ * @param {string} id 用户 id
+ * @param {Array<string>} roles 角色数组
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function updateUserRoles(id, roles) {
+  if (!id) return { ok: false, data: null, error: '缺少 id' }
+  const res = await request('PUT', `/admin/users/${id}/roles`, undefined, { roles })
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+// === 管理员：版块管理 ===
+
+/**
+ * 创建版块
+ * @param {Object} data 版块数据
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function createBoard(data = {}) {
+  const res = await request('POST', '/admin/boards', undefined, data)
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * 更新版块
+ * @param {string} id 版块 id
+ * @param {Object} data 待更新字段
+ * @returns {Promise<{ok:boolean, data:any, error:string|null}>}
+ */
+export async function updateBoard(id, data = {}) {
+  if (!id) return { ok: false, data: null, error: '缺少 id' }
+  const res = await request('PUT', `/admin/boards/${id}`, undefined, data)
+  if (!res.ok) return { ok: false, data: null, error: res.error }
+  return { ok: true, data: res.data, error: null }
+}
+
+/**
+ * 归档（删除）版块
+ * @param {string} id 版块 id
+ * @returns {Promise<{ok:boolean, error:string|null}>}
+ */
+export async function archiveBoard(id) {
+  if (!id) return { ok: false, error: '缺少 id' }
+  const res = await request('DELETE', `/admin/boards/${id}`)
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, error: null }
+}
+
+// === 管理员：仪表盘 ===
+
+/**
+ * 获取管理员仪表盘统计数据
+ * @returns {Promise<Object|null>} 仪表盘数据，失败返回 null
+ */
+export async function getAdminDashboard() {
+  const res = await request('GET', '/admin/dashboard')
+  return res.ok ? res.data : null
+}
+
 // 默认导出：聚合所有方法
 export default {
   getPosts,
@@ -635,4 +1000,25 @@ export default {
   aiHealth,
   aiGenerate,
   aiStream,
+  aiPostAssist,
+  aiQAStart,
+  aiQAStream,
+  searchSummary,
+  getRelatedPosts,
+  getKnowledgeItems,
+  createKnowledge,
+  updateKnowledge,
+  archiveKnowledge,
+  getModerationList,
+  resolveModeration,
+  createReport,
+  getReportList,
+  handleReport,
+  getAdminUsers,
+  updateUserStatus,
+  updateUserRoles,
+  createBoard,
+  updateBoard,
+  archiveBoard,
+  getAdminDashboard,
 }
