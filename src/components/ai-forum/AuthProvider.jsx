@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
-import { getCurrentUser, login as apiLogin, register as apiRegister, logout as apiLogout } from '../../utils/ai-forum/apiClient.js'
+import {
+  getCurrentUser, login as apiLogin, register as apiRegister, logout as apiLogout,
+  updateDevLevel as apiUpdateDevLevel,
+} from '../../utils/ai-forum/apiClient.js'
 
 const AuthContext = createContext(null)
 
@@ -212,6 +215,21 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  /**
+   * 更新当前用户的开发者身份等级
+   * 成功后同步更新全局 user 状态与持久化数据，供 AI 提示词语气适配使用
+   */
+  const updateDevLevel = useCallback(async (devLevel) => {
+    const updated = await apiUpdateDevLevel(devLevel)
+    setUser(updated)
+    try {
+      localStorage.setItem(STORAGE_USER, JSON.stringify(updated))
+    } catch {
+      // 隐私模式静默失败
+    }
+    return updated
+  }, [])
+
   /** 切换明暗主题：light ↔ dark */
   const toggleTheme = useCallback(() => {
     setTheme((t) => (t === 'light' ? 'dark' : 'light'))
@@ -262,6 +280,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    updateDevLevel,
     guestElapsed,
     guestStatus,
     showGuestBanner,
@@ -275,7 +294,7 @@ export function AuthProvider({ children }) {
     setLoginRedirect,
     setGuestElapsedRemaining,
   }), [
-    user, isAuthenticated, theme, toggleTheme, login, register, logout,
+    user, isAuthenticated, theme, toggleTheme, login, register, logout, updateDevLevel,
     guestElapsed, guestStatus, showGuestBanner, dismissGuestBanner,
     authModal, openAuthModal, closeAuthModal, requireAuth,
     loginRedirect, setGuestElapsedRemaining,

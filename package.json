@@ -17,6 +17,7 @@
     "db:migrate-phase1": "node scripts/migrate-phase1.mjs",
     "db:migrate-phase2": "node scripts/migrate-phase2.mjs",
     "db:migrate-phase4": "node scripts/migrate-phase4.mjs",
+    "db:migrate-dev-level": "node scripts/migrate-dev-level.mjs",
     "db:update-users": "node scripts/update-users.mjs"
   },
   "dependencies": {

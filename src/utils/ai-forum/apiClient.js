@@ -311,8 +311,10 @@ export async function login(username, password, deviceId) {
  * @returns {Promise<{ok:boolean, data:any, error:string|null, status:number}>}
  */
 export async function register(payload, deviceId) {
-  const { nickname, email, password } = payload || {}
+  const { nickname, email, password, devLevel } = payload || {}
   const body = { nickname, email, password }
+  // devLevel 只在有效取值时透传到后端（junior / senior）
+  if (devLevel === 'junior' || devLevel === 'senior') body.devLevel = devLevel
   // 同登录：附带 deviceId 让后端 UPDATE guests 绑定
   if (deviceId) body.deviceId = deviceId
   const res = await request('POST', '/auth/register', undefined, body)
@@ -731,6 +733,17 @@ export async function aiSummary(postId) {
 }
 
 /**
+ * 更新当前登录用户的开发者身份等级
+ * @param {'junior'|'senior'|null} devLevel 初级 / 资深 / 清空
+ * @returns {Promise<Object>} 返回更新后的 user 对象
+ */
+export async function updateDevLevel(devLevel) {
+  const res = await request('PUT', '/users/me/level', undefined, { devLevel })
+  if (res.ok) return res.data.user
+  throw new Error(res.error || '更新失败')
+}
+
+/**
  * 搜索摘要：为搜索关键词生成 AI 摘要
  * @param {string} q 关键词
  * @returns {Promise<Object|null>} 摘要对象，失败返回 null
@@ -1016,6 +1029,7 @@ export default {
   aiQAStart,
   aiQAStream,
   aiSummary,
+  updateDevLevel,
   searchSummary,
   getRelatedPosts,
   getKnowledgeItems,

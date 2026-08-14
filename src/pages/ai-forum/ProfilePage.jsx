@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   Heart, Mail, Pencil, UserPlus, File, Star, MessageCircle, Home,
+  UserCheck, AlertTriangle, Check,
 } from 'lucide-react'
 import Avatar from '../../components/ai-forum/common/Avatar.jsx'
 import EmptyState from '../../components/ai-forum/common/EmptyState.jsx'
@@ -19,7 +20,7 @@ const TABS = [
 export default function ProfilePage() {
   const navigate = useNavigate()
   const params = useParams()
-  const { user } = useAuth()
+  const { user, updateDevLevel } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const targetUserId = params.id || user?.id
@@ -32,6 +33,10 @@ export default function ProfilePage() {
   const [userFavorites, setUserFavorites] = useState([])
   const [userComments, setUserComments] = useState([])
   const [following, setFollowing] = useState(false)
+  // 开发者身份编辑态：未保存时与全局 user 分离，保存时再同步至全局
+  const [editingDevLevel, setEditingDevLevel] = useState(null)
+  const [savingDevLevel, setSavingDevLevel] = useState(false)
+  const [devLevelError, setDevLevelError] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -51,6 +56,10 @@ export default function ProfilePage() {
           return
         }
         setProfile(p)
+        // 若是自己的主页，初始化编辑态身份为已保存值
+        if (isSelf && user) {
+          setEditingDevLevel(p.devLevel || user.devLevel || 'junior')
+        }
         setUserPosts(Array.isArray(posts) ? posts : posts.items || [])
         setUserFavorites(Array.isArray(favs) ? favs : favs.items || [])
         setUserComments(Array.isArray(comments) ? comments : comments.items || [])
@@ -82,8 +91,36 @@ export default function ProfilePage() {
     alert('编辑主页（Phase3）')
   }
 
+  /**
+   * 保存开发者身份：
+   * - 调用 AuthProvider.updateDevLevel 更新全局 user 状态（含 localStorage 持久化）
+   * - 同步刷新本地 profile 展示，让身份徽标立即更新
+   */
+  const handleSaveDevLevel = async () => {
+    if (!editingDevLevel || savingDevLevel) return
+    setSavingDevLevel(true)
+    setDevLevelError('')
+    try {
+      const updated = await updateDevLevel(editingDevLevel)
+      setProfile((p) => (p ? { ...p, devLevel: updated.devLevel } : p))
+    } catch (e) {
+      setDevLevelError(e.message || '保存失败，请稍后重试')
+      // 回滚编辑态为已保存值，避免用户以为保存成功
+      setEditingDevLevel(user?.devLevel || profile?.devLevel || 'junior')
+    } finally {
+      setSavingDevLevel(false)
+    }
+  }
+
   const isSelf = user && profile ? user.id === profile.id : false
   const influencePercent = Math.min(((profile?.influenceScore || 0) / 10) * 100, 100)
+  // 当前展示的等级：优先展示编辑态，用于身份徽标的实时预览
+  const displayDevLevel = isSelf ? (editingDevLevel || profile?.devLevel || user?.devLevel || 'junior') : (profile?.devLevel || 'junior')
+  const devLevelOptions = [
+    { value: 'junior', title: 'AI 初级开发者', desc: 'AI 助手将用直白易懂的话语回答', badge: '初级' },
+    { value: 'senior', title: '资深 AI 开发者', desc: 'AI 助手将使用专业术语深入解答', badge: '资深' },
+  ]
+  const currentDevLevelMeta = devLevelOptions.find((o) => o.value === displayDevLevel) || devLevelOptions[0]
 
   const renderPostsList = (posts) => (
     posts.length > 0 ? (
@@ -253,9 +290,17 @@ export default function ProfilePage() {
         <div className="flex">
           <Avatar text={profile.avatarText || profile.nickname} size="lg" className="!w-20 !h-20 !text-3xl shrink-0" />
           <div className="flex-1 ml-6">
-            <div className="flex items-baseline flex-wrap">
+            <div className="flex items-baseline flex-wrap gap-2">
               <h1 className="text-2xl font-bold text-foreground">{profile.nickname}</h1>
-              <span className="text-afmuted-foreground ml-2">@{profile.handle || profile.username || 'user'}</span>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                currentDevLevelMeta.value === 'senior'
+                  ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/20'
+                  : 'bg-blue-500/15 text-blue-600 border border-blue-500/20'
+              }`}>
+                <UserCheck className="size-3" />
+                {currentDevLevelMeta.badge}
+              </span>
+              <span className="text-afmuted-foreground">@{profile.handle || profile.username || 'user'}</span>
             </div>
             <div className="text-sm text-afmuted-foreground mt-1">
               {[profile.profession, profile.city, profile.joinedAt ? `加入于 ${profile.joinedAt}` : null].filter(Boolean).join(' · ')}
@@ -296,6 +341,67 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* 开发者身份设置：仅在查看自己的主页时显示 */}
+        {isSelf ? (
+          <div className="mt-6 pt-6 border-t border-border">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <UserCheck className="size-4 text-primary" />
+                  开发者身份
+                </h3>
+                <p className="text-xs text-afmuted-foreground mt-1">
+                  AI 助手将根据您选择的身份调整回复的详细程度与用词风格
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveDevLevel}
+                disabled={savingDevLevel || editingDevLevel === (profile?.devLevel || user?.devLevel)}
+                className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-af-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Check className="size-3.5" />
+                {savingDevLevel ? '保存中…' : '保存'}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {devLevelOptions.map((opt) => {
+                const selected = editingDevLevel === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setEditingDevLevel(opt.value)}
+                    className={`text-left p-3 rounded-af-md border transition-colors ${
+                      selected
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'border-border bg-card hover:bg-afmuted text-afmuted-foreground'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium">{opt.title}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
+                        opt.value === 'senior'
+                          ? 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20'
+                          : 'bg-blue-500/15 text-blue-600 border-blue-500/20'
+                      }`}>
+                        {opt.badge}
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-snug opacity-80">{opt.desc}</p>
+                  </button>
+                )
+              })}
+            </div>
+            {devLevelError ? (
+              <div className="flex items-start gap-2 mt-3 rounded-af-md bg-error-bg p-2.5 text-xs text-error">
+                <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
+                <span>{devLevelError}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-6 pt-6 border-t border-border">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

@@ -7,7 +7,7 @@ export default function AuthModal() {
   const { authModal, closeAuthModal, login, register, guestStatus, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
-  const [form, setForm] = useState({ nickname: '', email: '', password: '' })
+  const [form, setForm] = useState({ nickname: '', email: '', password: '', devLevel: 'junior' })
   // 异步提交中：防止重复点击
   const [submitting, setSubmitting] = useState(false)
   // 错误提示：展示后端返回的 error 字段
@@ -59,6 +59,7 @@ export default function AuthModal() {
         nickname: form.nickname,
         email: form.email,
         password: form.password,
+        devLevel: form.devLevel,
       })
       setSubmitting(false)
       if (!user) {
@@ -153,6 +154,35 @@ export default function AuthModal() {
               onChange={(v) => setForm((f) => ({ ...f, email: v }))} />
             <Field icon={Lock} type="password" placeholder="密码" value={form.password}
               onChange={(v) => setForm((f) => ({ ...f, password: v }))} />
+
+            {mode === 'register' ? (
+              <div>
+                <p className="text-xs text-afmuted-foreground mb-2">请选择您的开发者身份（AI 助手将据此调整回复话术）：</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'junior', title: 'AI 初级开发者', desc: '刚入门 AI 开发，希望回答直白易懂' },
+                    { value: 'senior', title: '资深 AI 开发者', desc: '熟悉 AI 技术栈，希望回答专业深入' },
+                  ].map((opt) => {
+                    const selected = form.devLevel === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, devLevel: opt.value }))}
+                        className={`p-2.5 rounded-af-md border text-left transition-colors ${
+                          selected
+                            ? 'border-primary bg-primary/10 text-foreground'
+                            : 'border-border bg-card hover:bg-afmuted text-afmuted-foreground'
+                        }`}
+                      >
+                        <p className="text-sm font-medium mb-0.5">{opt.title}</p>
+                        <p className="text-[10px] leading-snug opacity-80">{opt.desc}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <button
               type="submit"
