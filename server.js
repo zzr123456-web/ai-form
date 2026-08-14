@@ -662,6 +662,8 @@ async function handleCreatePost(req, res, authUser) {
   }
   // 异步触发 AI 风险分级：不阻塞响应，失败静默忽略（不影响发帖主流程）
   applyContentRisk({ targetType: 'post', targetId: id, content, boardId }).catch(() => {})
+  // 异步触发 AI 小助手自动评论：发帖后 AI 自动生成一条评论参与讨论
+  generateAICommentForPost(id).catch(() => {})
   // 发帖后清除列表缓存（排序变化）和版块缓存（post_count 变化），避免脏读
   await cacheDelPattern('af:posts:list:*')
   await cacheDel(boardListKey())
@@ -1024,6 +1026,12 @@ async function handleCreateComment(req, res, authUser, postId) {
     content: content.trim(),
     boardId: postBoardId,
   }).catch(() => {})
+
+  // 检测评论中是否 @ai小助手，触发 AI 自动回复（异步不阻塞）
+  const trimmedContent = content.trim().toLowerCase()
+  if (trimmedContent.includes('@ai小助手') || trimmedContent.includes('@ai助手') || trimmedContent.includes('@ai-assistant')) {
+    generateAIReplyForComment(id, postId).catch(() => {})
+  }
 
   // 回查最新评论树，返回给前端替换（保证强一致）
   const listResult = await handleListCommentsNoSend(postId)
@@ -1801,6 +1809,189 @@ async function ensurePhase4Tables() {
   console.log('📦 Phase4 表自检完成')
 }
 
+/**
+ * AI 小助手的固定用户 ID，发帖自动回复和 @ai小助手 触发的回复都以该用户身份发布
+ */
+const AI_ASSISTANT_USER_ID = 'u_ai_assistant'
+
+/**
+ * 启动时确保 AI 小助手用户存在（幂等）
+ * 头像文字为 "AI"，昵称 "AI小助手"，roles 标记为 ai_assistant 便于前端识别
+ */
+async function ensureAIAssistantUser() {
+  try {
+    await dbQuery(
+      `INSERT INTO users (id, nickname, email, avatar_text, bio, handle, status, roles, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        AI_ASSISTANT_USER_ID,
+        'AI小助手',
+        'ai-assistant@ai-forum.local',
+        'AI',
+        '我是论坛的 AI 小助手，可以帮你解答问题、补充观点。在评论中 @ai小助手 即可召唤我。',
+        'ai_assistant',
+        ['user', 'ai_assistant'],
+      ]
+    )
+    console.log('🤖 AI 小助手用户已就绪')
+  } catch (err) {
+    console.warn('[ensureAIAssistantUser] 初始化失败（可忽略，首次调用时再创建）:', err.message)
+  }
+}
+
+/**
+ * 发帖后异步生成 AI 评论：读取帖子标题+正文，调用 LLM 生成一条简短评论
+ * - 不阻塞发帖响应，失败静默忽略
+ * - AI 评论的 author_id 为 AI_ASSISTANT_USER_ID
+ * - 内容控制在 200 字以内，风格友好、有观点增量
+ */
+async function generateAICommentForPost(postId) {
+  try {
+    console.log(`[AI:auto-comment] 开始为帖子 ${postId} 生成 AI 评论`)
+    const { rows } = await dbQuery(
+      `SELECT id, title, content, summary FROM posts WHERE id = $1`,
+      [postId]
+    )
+    if (rows.length === 0) {
+      console.warn(`[AI:auto-comment] 帖子不存在 postId=${postId}`)
+      return
+    }
+    const post = rows[0]
+    const postContext = `标题：${post.title}\n摘要：${post.summary || '无'}\n正文：${(post.content || '').slice(0, 800)}`
+
+    const systemPrompt = `你是一个论坛的 AI 小助手。用户刚发了一篇帖子，请你作为社区参与者写一条简短评论。
+要求：
+1. 评论内容 50-150 字，友好、有观点增量（不要单纯复述帖子内容）
+2. 可以补充一个相关视角、提一个引导性问题、或分享一个相关经验
+3. 不要使用 markdown 格式，纯文本即可
+4. 不要说"作为AI"，直接以社区成员口吻评论`
+
+    const result = await createChatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: postContext },
+      ],
+      { temperature: 0.8, max_tokens: 256 }
+    )
+    const reply = (result.content || '').trim()
+    if (!reply) {
+      console.warn(`[AI:auto-comment] LLM 返回空内容 postId=${postId}`)
+      return
+    }
+
+    const commentId = `c_ai_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    await dbQuery(
+      `INSERT INTO comments (id, post_id, author_id, parent_id, content, likes, created_at)
+       VALUES ($1, $2, $3, NULL, $4, 0, NOW())`,
+      [commentId, postId, AI_ASSISTANT_USER_ID, reply]
+    )
+    // 帖子评论计数 +1
+    await dbQuery(
+      `UPDATE posts SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = $1`,
+      [postId]
+    )
+    // 失效评论缓存，让前端下次拉取能看到 AI 评论
+    await cacheDel(commentsKey(postId))
+    await cacheDel(postKey(postId))
+    console.log(`[AI:auto-comment] AI 评论已生成 commentId=${commentId} 长度=${reply.length}`)
+  } catch (err) {
+    console.warn(`[AI:auto-comment] 生成失败 postId=${postId}:`, err.message)
+  }
+}
+
+/**
+ * @ai小助手 触发的 AI 回复：用户在评论中 @ai小助手，AI 以子评论身份回复
+ * - 读取触发评论 + 帖子上下文 + 同帖其他评论，调用 LLM 生成回复
+ * - 回复的 parent_id 指向触发评论，author_id 为 AI_ASSISTANT_USER_ID
+ */
+async function generateAIReplyForComment(commentId, postId) {
+  try {
+    console.log(`[AI:reply-comment] 开始为评论 ${commentId} 生成 AI 回复`)
+    // 读取触发评论内容
+    const { rows: commentRows } = await dbQuery(
+      `SELECT id, content, author_id FROM comments WHERE id = $1`,
+      [commentId]
+    )
+    if (commentRows.length === 0) {
+      console.warn(`[AI:reply-comment] 评论不存在 commentId=${commentId}`)
+      return
+    }
+    const triggerComment = commentRows[0]
+
+    // 读取帖子上下文
+    const { rows: postRows } = await dbQuery(
+      `SELECT id, title, content FROM posts WHERE id = $1`,
+      [postId]
+    )
+    if (postRows.length === 0) {
+      console.warn(`[AI:reply-comment] 帖子不存在 postId=${postId}`)
+      return
+    }
+    const post = postRows[0]
+
+    // 读取同帖最近 5 条评论作为对话上下文
+    const { rows: contextRows } = await dbQuery(
+      `SELECT c.content, u.nickname
+       FROM comments c
+       LEFT JOIN users u ON c.author_id = u.id
+       WHERE c.post_id = $1 AND c.id != $2
+       ORDER BY c.created_at DESC
+       LIMIT 5`,
+      [postId, commentId]
+    )
+    const contextText = contextRows.length > 0
+      ? contextRows.map((r) => `${r.nickname || '匿名'}：${r.content}`).join('\n')
+      : '（暂无其他评论）'
+
+    const systemPrompt = `你是一个论坛的 AI 小助手。用户在评论中 @你，请你回复。
+帖子标题：${post.title}
+帖子正文：${(post.content || '').slice(0, 500)}
+
+对话上下文（最近评论）：
+${contextText}
+
+要求：
+1. 回复内容 50-200 字，直接回应用户的评论
+2. 友好、有帮助，可以补充信息、解答疑问或提供不同视角
+3. 不要使用 markdown 格式，纯文本
+4. 不要说"作为AI"，以社区成员口吻回复`
+
+    const userMessage = `用户${triggerComment.author_id === AI_ASSISTANT_USER_ID ? '（另一用户）' : ''}说：${triggerComment.content}`
+
+    const result = await createChatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      { temperature: 0.8, max_tokens: 384 }
+    )
+    const reply = (result.content || '').trim()
+    if (!reply) {
+      console.warn(`[AI:reply-comment] LLM 返回空内容 commentId=${commentId}`)
+      return
+    }
+
+    const replyId = `c_ai_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    await dbQuery(
+      `INSERT INTO comments (id, post_id, author_id, parent_id, content, likes, created_at)
+       VALUES ($1, $2, $3, $4, $5, 0, NOW())`,
+      [replyId, postId, AI_ASSISTANT_USER_ID, commentId, reply]
+    )
+    // 帖子评论计数 +1
+    await dbQuery(
+      `UPDATE posts SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = $1`,
+      [postId]
+    )
+    // 失效评论缓存
+    await cacheDel(commentsKey(postId))
+    await cacheDel(postKey(postId))
+    console.log(`[AI:reply-comment] AI 回复已生成 replyId=${replyId} 长度=${reply.length}`)
+  } catch (err) {
+    console.warn(`[AI:reply-comment] 生成失败 commentId=${commentId}:`, err.message)
+  }
+}
+
 // ======== Phase4：内容审核 / 举报 / 后台管理 ========
 
 /**
@@ -2468,7 +2659,7 @@ async function handleGetUserProfile(req, res, userId) {
   if (cached) return sendJson(res, 200, cached)
 
   const { rows: userRows } = await dbQuery(
-    `SELECT id, handle, nickname, avatar_text, bio, created_at, updated_at FROM users WHERE id = $1`,
+    `SELECT id, handle, nickname, avatar_text, bio, profession, city, joined_at, created_at, updated_at FROM users WHERE id = $1`,
     [userId]
   )
   if (userRows.length === 0) {
@@ -2495,6 +2686,9 @@ async function handleGetUserProfile(req, res, userId) {
     nickname: user.nickname,
     avatarText: user.avatar_text,
     bio: user.bio,
+    profession: user.profession,
+    city: user.city,
+    joinedAt: toISO(user.joined_at),
     createdAt: toISO(user.created_at),
     updatedAt: toISO(user.updated_at),
     postCount,
@@ -3198,6 +3392,8 @@ server.listen(PORT, async () => {
     await ensurePhase2Tables()
     // Phase4：内容审核相关表与字段（moderation_cases / reports 等）
     await ensurePhase4Tables()
+    // AI 小助手用户初始化（发帖自动评论和 @ai小助手 回复的身份）
+    await ensureAIAssistantUser()
   }
   // Redis 健康检查，失败仅告警不阻断服务（缓存层自动降级）
   try {
