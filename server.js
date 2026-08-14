@@ -916,6 +916,49 @@ async function handleAIStream(req, res, authUser) {
   return true
 }
 
+/**
+ * 启动时自动确保 Phase1 新增表存在（幂等）
+ * 避免部署后忘记执行迁移脚本导致 guest_sessions / ai_usage_logs 缺表 → 500
+ */
+async function ensurePhase1Tables() {
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS guest_sessions (
+      id TEXT PRIMARY KEY,
+      device_id TEXT NOT NULL UNIQUE,
+      started_at TIMESTAMPTZ NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expiring','expired','bound')),
+      bound_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      remaining_seconds INTEGER NOT NULL DEFAULT 300,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS ai_usage_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      model TEXT NOT NULL DEFAULT 'deepseek-chat',
+      prompt_tokens INTEGER DEFAULT 0,
+      completion_tokens INTEGER DEFAULT 0,
+      latency_ms INTEGER DEFAULT 0,
+      error_msg TEXT,
+      raw_request_truncated TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_guest_sessions_device_id ON guest_sessions(device_id)',
+    'CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_user_id ON ai_usage_logs(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created_at ON ai_usage_logs(created_at)',
+  ]
+  for (const sql of statements) {
+    try {
+      await dbQuery(sql)
+    } catch (err) {
+      // 单条失败不阻断启动（可能 users 表尚未创建等，后续 migrate 脚本会补全）
+      console.warn('[ensurePhase1Tables] 语句执行失败（可忽略）:', err.message)
+    }
+  }
+  console.log('📦 Phase1 表自检完成（guest_sessions / ai_usage_logs）')
+}
+
 async function handleGuestStart(req, res) {
   const body = await readJsonBody(req)
   let deviceId = body.deviceId || req.headers['x-device-id']
@@ -1724,6 +1767,10 @@ server.listen(PORT, async () => {
   } catch (err) {
     dbConnected = false
     console.error('⚠️ 数据库健康检查失败:', err.message)
+  }
+  // 数据库连接正常时自动确保 Phase1 表存在，避免缺表导致 guest/AI 接口 500
+  if (dbConnected) {
+    await ensurePhase1Tables()
   }
   // Redis 健康检查，失败仅告警不阻断服务（缓存层自动降级）
   try {
