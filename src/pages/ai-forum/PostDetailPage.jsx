@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   Sparkles, Heart, Star, Flag, Share2, MessageCircle,
-  ChevronRight, Home, Eye, Send,
+  ChevronRight, Home, Eye, Send, Bot, Loader2,
 } from 'lucide-react'
 import Avatar from '../../components/ai-forum/common/Avatar.jsx'
 import TagPill from '../../components/ai-forum/common/TagPill.jsx'
@@ -41,6 +41,18 @@ export default function PostDetailPage() {
   const [submittingComment, setSubmittingComment] = useState(false)
   // 举报弹窗显示状态：点击举报按钮时打开 ReportDialog
   const [showReportDialog, setShowReportDialog] = useState(false)
+  // AI 回复轮询：检测到 AI 生成中时自动拉取评论，最长 60s
+  // - isAIThinking：true 时显示"AI 小助手正在思考中..."提示
+  // - aiPollingTimerRef：轮询定时器引用，卸载/取消时清理
+  // - aiPollingCountRef：当前轮询次数，到上限后停止
+  const [isAIThinking, setIsAIThinking] = useState(false)
+  const aiPollingTimerRef = useRef(null)
+  const aiPollingCountRef = useRef(0)
+  // 记录上一次评论数量（顶层+嵌套），轮询时用于判断是否有新评论（AI 写入了 DB）
+  const lastCommentCountRef = useRef(0)
+  // 单次 AI 轮询上限：发帖 AI 评论通常 <10s 生成，@ai小助手 回复通常 <15s，给 30 次 x 2s = 60s 缓冲
+  const AI_POLLING_MAX_TIMES = 30
+  const AI_POLLING_INTERVAL_MS = 2000
 
   // ====== 数据加载：postId 变化时重新拉取帖子 + 评论 + 互动状态 ======
   // cancelled 标志防止快速切换路由时旧请求覆盖新状态（组件已卸载仍 setState）
@@ -81,7 +93,8 @@ export default function PostDetailPage() {
         setPost(postData)
       }
       // getComments 失败时兜底为空数组，不影响帖子主体展示
-      setComments(Array.isArray(commentsData) ? commentsData : [])
+      const _comments = Array.isArray(commentsData) ? commentsData : []
+      setComments(_comments)
       // 互动状态：未登录/无记录时保持默认 false
       if (interactionsData) {
         setLiked(!!interactionsData.liked)
@@ -89,6 +102,31 @@ export default function PostDetailPage() {
         setLikedCommentIds(Array.isArray(interactionsData.likedCommentIds) ? interactionsData.likedCommentIds : [])
       }
       setLoading(false)
+
+      // 进入帖子详情时：若帖子创建时间 < 60 秒（刚发布）且评论中还没有 AI 小助手的评论，
+      // 启动一轮 AI 轮询——覆盖"发帖后跳转过来但 AI 评论还没生成"的场景
+      try {
+        if (postData?.createdAt) {
+          const postAgeSec = (Date.now() - new Date(postData.createdAt).getTime()) / 1000
+          // 检查是否已有 AI 小助手的评论（author.nickname === 'AI小助手' 或 author.id 以 u_ai 开头）
+          let hasAIComment = false
+          for (const c of _comments) {
+            if (c.author && (c.author.id === 'u_ai_assistant' || c.author.nickname === 'AI小助手')) {
+              hasAIComment = true; break
+            }
+            for (const r of (c.replies || [])) {
+              if (r.author && (r.author.id === 'u_ai_assistant' || r.author.nickname === 'AI小助手')) {
+                hasAIComment = true; break
+              }
+            }
+            if (hasAIComment) break
+          }
+          if (postAgeSec < 120 && !hasAIComment) {
+            console.log(`[AI:polling] 新发帖进入详情页 postAge=${postAgeSec.toFixed(0)}s 无AI评论，启动轮询`)
+            startAIPolling()
+          }
+        }
+      } catch { /* startAIPolling 依赖已定义在下方,用 setTimeout 延后防时序问题 */ }
 
       // 相关推荐：走专用端点 GET /posts/:id/related，best-effort 加载，失败不影响主流程
       // 不依赖 apiClient.js（避免与并行更新冲突），inline fetch 复用同一鉴权模式
@@ -150,6 +188,66 @@ export default function PostDetailPage() {
     }
     return Array.from(map.values())
   }, [comments])
+
+  // ====== AI 回复轮询：异步 AI 生成期间自动刷新评论 ======
+
+  /** 清空当前 AI 轮询定时器（调用前先做非空、非活跃检查） */
+  const clearAIPollingTimer = () => {
+    if (aiPollingTimerRef.current) {
+      clearInterval(aiPollingTimerRef.current)
+      aiPollingTimerRef.current = null
+    }
+  }
+
+  /** 启动 AI 轮询：每 AI_POLLING_INTERVAL_MS 拉一次评论，直到检测到评论数变化或达到上限 */
+  const startAIPolling = () => {
+    // 已在运行时不重复启动，避免多个定时器叠加
+    if (aiPollingTimerRef.current) return
+    aiPollingCountRef.current = 0
+    // 记录当前评论数量，轮询时对比变化——只有评论数增加才说明 AI 写入了新回复
+    lastCommentCountRef.current = totalCommentsCount
+    setIsAIThinking(true)
+    console.log(`[AI:polling] 启动轮询 当前评论数=${lastCommentCountRef.current}`)
+    aiPollingTimerRef.current = setInterval(async () => {
+      aiPollingCountRef.current += 1
+      try {
+        const fresh = await getComments(id)
+        const freshList = Array.isArray(fresh) ? fresh : []
+        // 统计新评论总数
+        let newCount = freshList.length
+        for (const c of freshList) {
+          if (c.replies && Array.isArray(c.replies)) newCount += c.replies.length
+        }
+        console.log(`[AI:polling] 第${aiPollingCountRef.current}次 新评论数=${newCount} 旧数=${lastCommentCountRef.current}`)
+        if (newCount > lastCommentCountRef.current) {
+          // 评论数增加：说明 AI 已写入，刷新并退出轮询
+          setComments(freshList)
+          lastCommentCountRef.current = newCount
+          console.log(`[AI:polling] 检测到新评论，停止轮询`)
+          setIsAIThinking(false)
+          clearAIPollingTimer()
+          return
+        }
+      } catch (err) {
+        console.warn(`[AI:polling] 拉取评论失败: ${err.message}`)
+      }
+      if (aiPollingCountRef.current >= AI_POLLING_MAX_TIMES) {
+        console.log(`[AI:polling] 达到最大次数${AI_POLLING_MAX_TIMES}，停止轮询`)
+        setIsAIThinking(false)
+        clearAIPollingTimer()
+      }
+    }, AI_POLLING_INTERVAL_MS)
+  }
+
+  /** 检查评论内容是否包含 @ai小助手 召唤词 */
+  const containsAIMention = (text) => /@ai[_\-]*(小?)助手/i.test(text || '')
+
+  // 组件卸载或 postId 变化时清理轮询定时器（与 useEffect 的清理函数配合）
+  useEffect(() => {
+    return () => {
+      clearAIPollingTimer()
+    }
+  }, [id])
 
   // ====== 互动事件处理：全部接入真实 API 持久化 ======
 
@@ -227,6 +325,10 @@ export default function PostDetailPage() {
     setCommentText('')
     // 同步帖子 comments_count
     if (post) setPost({ ...post, commentsCount: (post.commentsCount || 0) + 1 })
+    // 如果包含 @ai小助手 召唤词，启动 AI 回复轮询（异步生成期间自动刷新评论）
+    if (containsAIMention(text)) {
+      startAIPolling()
+    }
   }
 
   /**
@@ -283,6 +385,10 @@ export default function PostDetailPage() {
       setComments(result.comments)
     }
     if (post) setPost({ ...post, commentsCount: (post.commentsCount || 0) + 1 })
+    // 如果包含 @ai小助手 召唤词，启动 AI 回复轮询
+    if (containsAIMention(text)) {
+      startAIPolling()
+    }
     return { ok: true }
   }
 
@@ -484,9 +590,19 @@ export default function PostDetailPage() {
           {/* ========== b) 评论区 ========== */}
           <section className="bg-card border border-border rounded-af-xl p-5 sm:p-6">
             {/* 标题：顶层评论数 + 回复数总和 */}
-            <h2 className="font-semibold text-foreground mb-5">
-              评论 <span className="text-afmuted-foreground font-normal">({totalCommentsCount})</span>
-            </h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-semibold text-foreground">
+                评论 <span className="text-afmuted-foreground font-normal">({totalCommentsCount})</span>
+              </h2>
+              {/* AI 小助手正在思考中状态提示（轮询进行中显示） */}
+              {isAIThinking ? (
+                <div className="inline-flex items-center gap-1.5 text-xs text-primary bg-primary/10 border border-primary/20 rounded-full px-3 py-1">
+                  <Bot className="size-3.5" />
+                  <Loader2 className="size-3 animate-spin" />
+                  <span>AI 小助手正在思考中...</span>
+                </div>
+              ) : null}
+            </div>
 
             {/* 评论输入框占位 */}
             <div className="mb-6">
