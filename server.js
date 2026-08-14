@@ -1349,6 +1349,97 @@ async function handleAIPostAssist(req, res, authUser) {
 }
 
 /**
+ * AI 讨论总结：基于帖子内容与评论，生成结构化总结
+ * 包含核心观点、分歧点、补充建议
+ */
+async function handleAISummary(req, res, authUser) {
+  const userId = authUser.userId
+  const body = await readJsonBody(req)
+  const { postId } = body
+  if (!postId) {
+    return sendJson(res, 400, { error: '缺少必填字段：postId' })
+  }
+
+  const rate = await aiRateLimit(userId, 20, 60)
+  if (!rate.ok) {
+    return sendJson(res, 429, { error: 'AI 调用过于频繁，请稍后再试' })
+  }
+
+  const post = await fetchPostById(postId)
+  if (!post) {
+    return sendJson(res, 404, { error: '帖子不存在' })
+  }
+
+  // 加载评论作为总结素材
+  const comments = await handleListCommentsNoSend(postId)
+  const commentTexts = comments
+    .filter((c) => !c.deleted_at)
+    .slice(0, 30)
+    .map((c) => {
+      const author = c.author?.nickname || '匿名'
+      return `${author}：${c.content}`
+    })
+    .join('\n')
+
+  const systemPrompt = `你是一个论坛讨论总结助手。请根据帖子内容和所有评论，生成一份结构化的讨论总结。
+返回JSON格式，包含以下字段：
+{
+  "core_points": ["观点1", "观点2", "观点3"],
+  "controversies": ["分歧点1", "分歧点2"],
+  "suggestions": ["建议1", "建议2", "建议3"],
+  "summary": "3-5句话的整体讨论概述"
+}
+要求：
+- 观点要精炼，每条不超过20字
+- 分歧点要具体，避免空话
+- 建议要可操作，结合讨论内容
+- 直接返回JSON，不要其他文本`
+
+  const userMessage = `【帖子标题】${post.title}\n【帖子正文】${post.content}\n【讨论评论】\n${commentTexts || '暂无评论'}`
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage },
+  ]
+
+  const startMs = Date.now()
+  let errorMsg = null
+
+  try {
+    const result = await createChatCompletion(messages, { temperature: 0.4, max_tokens: 1024 })
+    const raw = result.content || ''
+    const jsonStr = raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
+    const parsed = JSON.parse(jsonStr)
+
+    const latMs = Date.now() - startMs
+    const logId = `aisum_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    const promptTokens = result.usage?.prompt_tokens ?? 0
+    const completionTokens = result.usage?.completion_tokens ?? 0
+
+    dbQuery(
+      `INSERT INTO ai_usage_logs (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, error_msg, raw_request_truncated, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      [logId, userId, 'deepseek-chat', promptTokens, completionTokens, latMs, null, truncateForLog(JSON.stringify({ postId }), 500)]
+    ).catch(() => {})
+
+    return sendJson(res, 200, parsed)
+  } catch (e) {
+    errorMsg = String(e.message || e).slice(0, 500)
+    console.error('[AI:summary] LLM 调用失败:', errorMsg)
+
+    const latMs = Date.now() - startMs
+    const logId = `aisum_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    dbQuery(
+      `INSERT INTO ai_usage_logs (id, user_id, model, prompt_tokens, completion_tokens, latency_ms, error_msg, raw_request_truncated, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      [logId, userId, 'deepseek-chat', 0, 0, latMs, errorMsg, truncateForLog(JSON.stringify({ postId }), 500)]
+    ).catch(() => {})
+
+    return sendJson(res, 502, { error: errorMsg || 'AI 总结生成失败', from_llm: false })
+  }
+}
+
+/**
  * AI 答疑启动：创建问题记录，检索相似帖子与知识库条目
  * 不直接调用 LLM，仅做上下文准备；实际流式生成在 /ai/qa/stream
  */
@@ -3153,6 +3244,11 @@ async function matchForumRoute(req, res, pathname, method, url) {
       if (parts[1] === 'post-assist') {
         supportedMethods.push('POST')
         if (method === 'POST') return await requireAuth(handleAIPostAssist)(req, res)
+      }
+      // AI 讨论总结：基于帖子+评论生成结构化总结
+      if (parts[1] === 'summary') {
+        supportedMethods.push('POST')
+        if (method === 'POST') return await requireAuth(handleAISummary)(req, res)
       }
       // AI 答疑：/ai/qa/start 启动提问、/ai/qa/stream 流式生成回答
       if (parts[1] === 'qa' && parts.length >= 3) {

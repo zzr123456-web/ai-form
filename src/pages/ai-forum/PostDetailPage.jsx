@@ -580,7 +580,7 @@ export default function PostDetailPage() {
         <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-20 lg:self-start">
           {/* AI 讨论总结卡 */}
           <div className="mb-4">
-            <AISummaryCard />
+            <AISummaryCard postId={id} />
           </div>
         </aside>
       </div>

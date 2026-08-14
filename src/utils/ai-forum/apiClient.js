@@ -719,6 +719,18 @@ export async function aiQAStream(questionId, onChunk) {
 }
 
 /**
+ * AI 讨论总结：基于帖子内容与评论生成结构化总结
+ * @param {string} postId 帖子 id
+ * @returns {Promise<Object>} { core_points, controversies, suggestions, summary }
+ */
+export async function aiSummary(postId) {
+  if (!postId) throw new Error('缺少 postId')
+  const res = await request('POST', '/ai/summary', undefined, { postId })
+  if (res.ok) return res.data
+  throw new Error(res.error || '总结生成失败')
+}
+
+/**
  * 搜索摘要：为搜索关键词生成 AI 摘要
  * @param {string} q 关键词
  * @returns {Promise<Object|null>} 摘要对象，失败返回 null
@@ -1003,6 +1015,7 @@ export default {
   aiPostAssist,
   aiQAStart,
   aiQAStream,
+  aiSummary,
   searchSummary,
   getRelatedPosts,
   getKnowledgeItems,
