@@ -29,8 +29,8 @@ const REASON_LABEL = {
 const ACTIONS = [
   { key: 'reject',         label: '驳回',     icon: XCircle,        className: 'text-afmuted-foreground hover:bg-afmuted' },
   { key: 'warn',           label: '警告',     icon: AlertTriangle,  className: 'text-warning hover:bg-warning-bg' },
-  { key: 'delete_content', label: '删除内容', icon: Trash2,         className: 'text-error hover:bg-error-bg' },
-  { key: 'ban_user',       label: '封禁用户', icon: Ban,            className: 'text-error hover:bg-error-bg' },
+  { key: 'delete', label: '删除内容', icon: Trash2,         className: 'text-error hover:bg-error-bg' },
+  { key: 'ban',    label: '封禁用户', icon: Ban,            className: 'text-error hover:bg-error-bg' },
 ]
 
 /**

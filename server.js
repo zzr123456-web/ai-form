@@ -351,7 +351,8 @@ async function handleListPosts(req, res, url) {
   const sort = url.searchParams.get('sort') || 'latest'
   const boardId = url.searchParams.get('boardId')
   const tag = url.searchParams.get('tag')
-  const search = url.searchParams.get('search')
+  // 兼容 /posts?search= 与 /search?q= 两种参数命名
+  const search = url.searchParams.get('search') || url.searchParams.get('q')
   // type 控制搜索目标：user=用户、knowledge=知识库、post/缺省=帖子
   const type = url.searchParams.get('type') || 'post'
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
@@ -596,10 +597,18 @@ async function applyContentRisk({ targetType, targetId, content, boardId }) {
 }
 
 /**
- * 创建帖子
- * 必填：title、content、boardId；可选：authorId（默认 u_alex）、tags、summary
+ * 创建帖子（需登录，banned 用户禁止发帖）
+ * 必填：title、content、boardId；可选：tags、summary
+ * 作者 ID 取自鉴权用户 authUser.userId，不再信任客户端传入
  */
-async function handleCreatePost(req, res) {
+async function handleCreatePost(req, res, authUser) {
+  // token 不含 status 且可能过期（如管理员刚封禁该用户，旧 token 仍有效），
+  // 从 DB 拉取最新状态后再判断，避免被封禁用户继续发帖
+  const { rows: authRows } = await dbQuery(`SELECT status FROM users WHERE id = $1`, [authUser.userId])
+  if (authRows.length > 0) authUser.status = authRows[0].status
+  if (authUser.status === 'banned') {
+    return sendJson(res, 403, { error: '账号已被封禁，无法发帖' })
+  }
   const body = await readJsonBody(req)
   const { title, content, boardId } = body
   if (!title || !content || !boardId) {
@@ -613,7 +622,7 @@ async function handleCreatePost(req, res) {
       sensitive_segments: sensitiveSegments,
     })
   }
-  const authorId = body.authorId || 'u_alex'
+  const authorId = authUser.userId
   const tags = Array.isArray(body.tags) ? body.tags : []
   const summary = body.summary || null
   const id = `p_${Date.now()}`
@@ -941,6 +950,12 @@ async function handleTogglePostFavorite(req, res, authUser, postId) {
  * 成功后回查评论树并返回最新全量数据，同时更新 posts.comments_count
  */
 async function handleCreateComment(req, res, authUser, postId) {
+  // token 不含 status 且可能过期，从 DB 拉取最新状态，封禁用户禁止评论
+  const { rows: authRows } = await dbQuery(`SELECT status FROM users WHERE id = $1`, [authUser.userId])
+  if (authRows.length > 0) authUser.status = authRows[0].status
+  if (authUser.status === 'banned') {
+    return sendJson(res, 403, { error: '账号已被封禁，无法评论' })
+  }
   const body = await readJsonBody(req)
   const { content, parentId } = body
   if (!content || !content.trim()) {
@@ -2763,7 +2778,7 @@ async function matchForumRoute(req, res, pathname, method, url) {
     if (sub === '/posts') {
       supportedMethods.push('GET', 'POST')
       if (method === 'GET') return await handleListPosts(req, res, url)
-      if (method === 'POST') return await handleCreatePost(req, res)
+      if (method === 'POST') return await requireAuth(handleCreatePost)(req, res)
     }
     if (sub === '/users') {
       supportedMethods.push('GET')
@@ -2772,6 +2787,11 @@ async function matchForumRoute(req, res, pathname, method, url) {
     if (sub === '/search/summary') {
       supportedMethods.push('GET')
       if (method === 'GET') return await handleSearchSummary(req, res, url)
+    }
+    // 通用搜索端点：复用 handleListPosts，由其内部按 type=user/knowledge/post 分流
+    if (sub === '/search') {
+      supportedMethods.push('GET')
+      if (method === 'GET') return await handleListPosts(req, res, url)
     }
     // 举报提交：需要登录
     if (sub === '/reports') {

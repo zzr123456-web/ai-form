@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { useAuth } from '../../components/ai-forum/AuthProvider.jsx'
 import { createPost, getBoards } from '../../utils/ai-forum/apiClient.js'
@@ -14,11 +14,14 @@ const MAX_TAG_COUNT = 5
 export default function PostEditorPage() {
   const { isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
+  // 读取路由 state：QaPage「发布为帖子」跳转时携带 title/content/tags，用于回填编辑器
+  const location = useLocation()
 
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+  // title/content 直接取字符串；tags 在 QaPage 侧是数组，这里转换为 Set 以匹配后续 toggleTag 的 Set 操作
+  const [title, setTitle] = useState(location.state?.title || '')
+  const [content, setContent] = useState(location.state?.content || '')
   const [selectedBoardId, setSelectedBoardId] = useState('')
-  const [selectedTags, setSelectedTags] = useState(new Set())
+  const [selectedTags, setSelectedTags] = useState(new Set(location.state?.tags || []))
   const [showPreview, setShowPreview] = useState(false)
   // 版块列表从 API 异步加载
   const [boards, setBoards] = useState([])

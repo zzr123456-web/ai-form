@@ -27,7 +27,7 @@ const SOURCE_LABEL = {
 // 审核动作映射（对应后端 resolve 接口 action 参数）
 const ACTIONS = [
   { key: 'approve', label: '通过', icon: CheckCircle2, className: 'text-success hover:bg-success-bg' },
-  { key: 'collapse', label: '折叠', icon: ChevronsDown, className: 'text-warning hover:bg-warning-bg' },
+  { key: 'fold', label: '折叠', icon: ChevronsDown, className: 'text-warning hover:bg-warning-bg' },
   { key: 'delete', label: '删除', icon: Trash2, className: 'text-error hover:bg-error-bg' },
 ]
 
