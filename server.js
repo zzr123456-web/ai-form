@@ -3183,7 +3183,8 @@ async function handleUpdateDevLevel(req, res, authUser) {
     return sendJson(res, 404, { error: '用户不存在' })
   }
   // 使缓存失效：用户详情 + 用户列表
-  await cacheDel(userProfileKey(userId))
+  await cacheDel(userProfileCacheKey(userId))
+  await cacheDel(userKey(userId))
   await cacheDel(userListKey())
 
   return sendJson(res, 200, { user: mapUser(rows[0]) })
