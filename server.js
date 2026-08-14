@@ -317,8 +317,24 @@ async function handleListTopics(req, res) {
   const cacheKey = topicListKey()
   const cached = await cacheGet(cacheKey)
   if (cached) return sendJson(res, 200, cached)
-  const { rows } = await dbQuery(`SELECT * FROM topics ORDER BY heat DESC`)
-  const result = rows.map(mapTopic)
+  // 动态计算话题热度：统计近 7 天已发布帖子中各标签的使用次数作为真实热度
+  // 静态 heat 字段无法反映近期活跃度，故基于 post_tags 实时聚合
+  const { rows } = await dbQuery(
+    `SELECT t.*, COALESCE(tag_count.cnt, 0) AS real_heat
+     FROM topics t
+     LEFT JOIN (
+       SELECT pt.tag_name, COUNT(*) AS cnt
+       FROM post_tags pt
+       JOIN posts p ON pt.post_id = p.id
+       WHERE p.status = 'published' AND p.created_at >= NOW() - INTERVAL '7 days'
+       GROUP BY pt.tag_name
+     ) tag_count ON tag_count.tag_name = t.name
+     ORDER BY real_heat DESC`
+  )
+  // 过滤掉近 7 天无帖子的冷门话题（real_heat = 0），并用真实热度覆盖静态 heat
+  const result = rows
+    .filter((row) => parseInt(row.real_heat, 10) > 0)
+    .map((row) => ({ ...mapTopic(row), heat: parseInt(row.real_heat, 10) }))
   await cacheSet(cacheKey, result, TTL_TOPICS)
   return sendJson(res, 200, result)
 }
@@ -334,9 +350,45 @@ async function handleListPosts(req, res, url) {
   const boardId = url.searchParams.get('boardId')
   const tag = url.searchParams.get('tag')
   const search = url.searchParams.get('search')
+  // type 控制搜索目标：user=用户、knowledge=知识库、post/缺省=帖子
+  const type = url.searchParams.get('type') || 'post'
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
   const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '20', 10))
   const offset = (page - 1) * limit
+
+  // 分类搜索：type=user 走用户表，按昵称/handle 模糊匹配
+  if (type === 'user') {
+    if (!search) return sendJson(res, 200, [])
+    const userCacheKey = `af:search:users:${search}`
+    const userCached = await cacheGet(userCacheKey)
+    if (userCached) return sendJson(res, 200, userCached)
+    const { rows: userRows } = await dbQuery(
+      `SELECT * FROM users WHERE nickname ILIKE $1 OR handle ILIKE $1 ORDER BY joined_at DESC`,
+      [`%${search}%`]
+    )
+    const userResult = userRows.map(mapUser)
+    await cacheSet(userCacheKey, userResult, TTL_USERS)
+    return sendJson(res, 200, userResult)
+  }
+
+  // 分类搜索：type=knowledge 走知识库表；表可能尚未创建，try-catch 降级返回空数组
+  if (type === 'knowledge') {
+    if (!search) return sendJson(res, 200, [])
+    const kwCacheKey = `af:search:knowledge:${search}`
+    const kwCached = await cacheGet(kwCacheKey)
+    if (kwCached) return sendJson(res, 200, kwCached)
+    try {
+      const { rows: kwRows } = await dbQuery(
+        `SELECT * FROM knowledge_items WHERE title ILIKE $1 OR content ILIKE $1 ORDER BY created_at DESC`,
+        [`%${search}%`]
+      )
+      await cacheSet(kwCacheKey, kwRows, TTL_POSTS)
+      return sendJson(res, 200, kwRows)
+    } catch {
+      // knowledge_items 表不存在时静默降级，避免阻塞搜索功能
+      return sendJson(res, 200, [])
+    }
+  }
 
   const cacheKey = postListKey(sort, boardId, tag, page, limit, search)
   const cached = await cacheGet(cacheKey)
@@ -365,6 +417,10 @@ async function handleListPosts(req, res, url) {
     orderClause = 'ORDER BY (posts.likes + posts.comments_count * 2 + posts.views / 10) DESC'
   } else if (sort === 'quality') {
     orderClause = 'ORDER BY posts.quality_score DESC NULLS LAST'
+  } else if (sort === 'recommended') {
+    // 推荐流综合分：质量分(0.4) + 点赞(0.3) + 时间衰减(0.3)
+    // 时间衰减项 1/(1+天数) 让新帖权重更高，避免老帖长期霸榜；COALESCE 兜底 NULL 字段
+    orderClause = 'ORDER BY (COALESCE(posts.quality_score, 0) * 0.4 + COALESCE(posts.likes, 0) * 0.3 + (1.0 / (1 + EXTRACT(EPOCH FROM NOW() - posts.created_at) / 86400)) * 0.3) DESC'
   } else {
     orderClause = 'ORDER BY posts.created_at DESC'
   }
@@ -439,6 +495,34 @@ async function handleGetPost(req, res, id) {
 }
 
 /**
+ * 隐私信息检测：扫描文本中的手机号 / 身份证号 / 地址关键字
+ * 用于发帖前拦截，避免用户无意间公开个人敏感信息（隐私合规要求）
+ * @param {string} text 待检测文本
+ * @returns {Array<{type: string, match: string, position: number}>} 命中的敏感片段列表
+ */
+function detectSensitiveInfo(text) {
+  if (!text || typeof text !== 'string') return []
+  const segments = []
+  // 手机号：1 开头 + 第 2 位 3-9 + 9 位数字，共 11 位
+  const phoneRe = /1[3-9]\d{9}/g
+  // 身份证号：前 17 位数字 + 末位数字或 X/x，共 18 位
+  const idCardRe = /\d{17}[\dXx]/g
+  // 地址关键字：明确指向居住信息的词
+  const addressRe = /地址|住址|门牌号/g
+  let m
+  while ((m = phoneRe.exec(text)) !== null) {
+    segments.push({ type: 'phone', match: m[0], position: m.index })
+  }
+  while ((m = idCardRe.exec(text)) !== null) {
+    segments.push({ type: 'id_card', match: m[0], position: m.index })
+  }
+  while ((m = addressRe.exec(text)) !== null) {
+    segments.push({ type: 'address', match: m[0], position: m.index })
+  }
+  return segments
+}
+
+/**
  * 创建帖子
  * 必填：title、content、boardId；可选：authorId（默认 u_alex）、tags、summary
  */
@@ -447,6 +531,14 @@ async function handleCreatePost(req, res) {
   const { title, content, boardId } = body
   if (!title || !content || !boardId) {
     return sendJson(res, 400, { error: '缺少必填字段：title, content, boardId' })
+  }
+  // 隐私检测：在写入数据库前拦截，避免敏感信息落库后被缓存/索引难以彻底清除
+  const sensitiveSegments = detectSensitiveInfo(content)
+  if (sensitiveSegments.length > 0) {
+    return sendJson(res, 400, {
+      error: '内容包含敏感信息',
+      sensitive_segments: sensitiveSegments,
+    })
   }
   const authorId = body.authorId || 'u_alex'
   const tags = Array.isArray(body.tags) ? body.tags : []
@@ -529,6 +621,111 @@ async function handleListComments(req, res, postId) {
   }
   await cacheSet(cacheKey, topComments, TTL_COMMENTS)
   return sendJson(res, 200, topComments)
+}
+
+/**
+ * 相关推荐：先按共享标签查找相关帖，不足 5 条时用同版块帖子补齐
+ * 排序：点赞数优先，其次质量分；排除当前帖自身
+ */
+async function handleRelatedPosts(req, res, id) {
+  const cacheKey = `af:post:${id}:related`
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
+
+  // 先查当前帖的 board_id，用于后续同版块补齐；同时校验帖子存在
+  const { rows: curRows } = await dbQuery(`SELECT board_id FROM posts WHERE id = $1`, [id])
+  if (curRows.length === 0) {
+    return sendJson(res, 404, { error: '帖子不存在' })
+  }
+  const boardId = curRows[0].board_id
+
+  // 第一步：通过共享标签匹配相关帖（排除自身），按点赞与质量分排序，取 5 条
+  const { rows: tagRows } = await dbQuery(
+    `SELECT DISTINCT posts.*,
+            users.id AS u_id, users.nickname AS u_nickname, users.avatar_text AS u_avatar_text,
+            boards.id AS b_id, boards.name AS b_name, boards.color AS b_color
+     FROM posts
+     LEFT JOIN users ON posts.author_id = users.id
+     LEFT JOIN boards ON posts.board_id = boards.id
+     JOIN post_tags pt ON pt.post_id = posts.id
+     WHERE pt.tag_name IN (SELECT tag_name FROM post_tags WHERE post_id = $1)
+       AND posts.id != $1
+       AND posts.status = 'published'
+     ORDER BY posts.likes DESC NULLS LAST, posts.quality_score DESC NULLS LAST
+     LIMIT 5`,
+    [id]
+  )
+
+  let rows = tagRows
+  // 第二步：标签匹配不足 5 条时，用同版块帖子补齐（排除当前帖与已选帖）
+  if (rows.length < 5) {
+    const excludeIds = [id, ...rows.map((r) => r.id)]
+    const { rows: fillRows } = await dbQuery(
+      `SELECT posts.*,
+              users.id AS u_id, users.nickname AS u_nickname, users.avatar_text AS u_avatar_text,
+              boards.id AS b_id, boards.name AS b_name, boards.color AS b_color
+       FROM posts
+       LEFT JOIN users ON posts.author_id = users.id
+       LEFT JOIN boards ON posts.board_id = boards.id
+       WHERE posts.board_id = $1
+         AND posts.id != ALL($2::text[])
+         AND posts.status = 'published'
+       ORDER BY posts.likes DESC NULLS LAST, posts.quality_score DESC NULLS LAST
+       LIMIT $3`,
+      [boardId, excludeIds, 5 - rows.length]
+    )
+    rows = rows.concat(fillRows)
+  }
+
+  // 批量查询 tags，按 post_id 分组，避免逐条查询（N+1）
+  const tagsByPost = new Map()
+  if (rows.length > 0) {
+    const postIds = rows.map((r) => r.id)
+    const tagRows2 = await dbQuery(
+      `SELECT post_id, tag_name FROM post_tags WHERE post_id = ANY($1::text[])`,
+      [postIds]
+    )
+    for (const tr of tagRows2.rows) {
+      if (!tagsByPost.has(tr.post_id)) {
+        tagsByPost.set(tr.post_id, [])
+      }
+      tagsByPost.get(tr.post_id).push(tr.tag_name)
+    }
+  }
+
+  const result = rows.map((r) => mapPostRow(r, tagsByPost.get(r.id) || []))
+  await cacheSet(cacheKey, result, TTL_POSTS)
+  return sendJson(res, 200, result)
+}
+
+/**
+ * 搜索聚合摘要：调用 Deepseek 对搜索词生成 2-3 句总结
+ * 结果缓存 5 分钟，避免相同搜索词重复消耗 LLM 额度
+ */
+async function handleSearchSummary(req, res, url) {
+  const q = url.searchParams.get('q')
+  if (!q) {
+    return sendJson(res, 400, { error: '缺少必填参数：q' })
+  }
+  const cacheKey = `af:search:summary:${q}`
+  const cached = await cacheGet(cacheKey)
+  if (cached) return sendJson(res, 200, cached)
+
+  try {
+    const { content } = await createChatCompletion(
+      [
+        { role: 'system', content: '你是一个论坛搜索助手。请用2-3句话总结以下搜索词的相关内容。' },
+        { role: 'user', content: `搜索词：${q}` },
+      ],
+      { max_tokens: 256 }
+    )
+    const result = { summary: content }
+    // 缓存 5 分钟（300 秒），平衡内容新鲜度与 LLM 调用成本
+    await cacheSet(cacheKey, result, 300)
+    return sendJson(res, 200, result)
+  } catch (e) {
+    return sendJson(res, 502, { error: e.message || 'AI 摘要生成失败' })
+  }
 }
 
 // ======== 互动接口：点赞 / 收藏 / 评论写入 ========
@@ -983,6 +1180,115 @@ async function ensurePhase1Tables() {
     }
   }
   console.log('📦 Phase1 表自检完成（guest_sessions / ai_usage_logs）')
+}
+
+/**
+ * 启动时自动确保 Phase2 新增表存在（幂等）
+ * 覆盖 questions / ai_answers / source_citations / knowledge_items，避免缺表导致问答与知识库接口 500
+ */
+async function ensurePhase2Tables() {
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS questions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT,
+      source_mode TEXT DEFAULT 'site_only',
+      status TEXT DEFAULT 'submitted',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS ai_answers (
+      id TEXT PRIMARY KEY,
+      question_id TEXT REFERENCES questions(id) ON DELETE CASCADE,
+      content TEXT,
+      safety_label TEXT DEFAULT 'normal',
+      citation_ids TEXT[] DEFAULT '{}',
+      generated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS source_citations (
+      id TEXT PRIMARY KEY,
+      answer_id TEXT REFERENCES ai_answers(id) ON DELETE CASCADE,
+      source_type TEXT,
+      source_id TEXT,
+      title TEXT,
+      url TEXT,
+      excerpt TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS knowledge_items (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT,
+      tags TEXT[] DEFAULT '{}',
+      status TEXT DEFAULT 'active',
+      updated_by TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_questions_user_id ON questions(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_ai_answers_question_id ON ai_answers(question_id)',
+    'CREATE INDEX IF NOT EXISTS idx_source_citations_answer_id ON source_citations(answer_id)',
+    'CREATE INDEX IF NOT EXISTS idx_knowledge_items_status ON knowledge_items(status)',
+  ]
+  for (const sql of statements) {
+    try {
+      await dbQuery(sql)
+    } catch (err) {
+      // 单条失败不阻断启动（依赖的父表可能尚未创建，后续 migrate 脚本会补全）
+      console.warn('[ensurePhase2Tables] 语句执行失败（可忽略）:', err.message)
+    }
+  }
+  console.log('📦 Phase2 表自检完成')
+}
+
+/**
+ * 启动时自动确保 Phase4 内容审核相关表与字段存在（幂等）
+ * - moderation_cases / reports 两张表
+ * - posts/comments/boards 的风险等级与状态字段
+ * 避免缺表/缺字段导致审核与举报接口 500
+ */
+async function ensurePhase4Tables() {
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS moderation_cases (
+      id TEXT PRIMARY KEY,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      source TEXT DEFAULT 'manual',
+      risk_type TEXT,
+      risk_level TEXT DEFAULT 'none',
+      status TEXT DEFAULT 'open',
+      assignee_id TEXT,
+      resolution_note TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      resolved_at TIMESTAMPTZ
+    )`,
+    `CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY,
+      reporter_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      reason TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    // posts 已存在 risk_level 列，IF NOT EXISTS 保证幂等不报错
+    `ALTER TABLE posts ADD COLUMN IF NOT EXISTS risk_level TEXT DEFAULT 'none'`,
+    `ALTER TABLE posts ADD COLUMN IF NOT EXISTS moderation_status TEXT DEFAULT 'normal'`,
+    `ALTER TABLE comments ADD COLUMN IF NOT EXISTS risk_level TEXT DEFAULT 'none'`,
+    `ALTER TABLE comments ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'`,
+    `ALTER TABLE boards ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`,
+    'CREATE INDEX IF NOT EXISTS idx_moderation_cases_status ON moderation_cases(status)',
+    'CREATE INDEX IF NOT EXISTS idx_moderation_cases_risk_level ON moderation_cases(risk_level)',
+    'CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)',
+  ]
+  for (const sql of statements) {
+    try {
+      await dbQuery(sql)
+    } catch (err) {
+      // 单条失败不阻断启动（可能依赖表尚未创建等，后续 migrate 脚本会补全）
+      console.warn('[ensurePhase4Tables] 语句执行失败（可忽略）:', err.message)
+    }
+  }
+  console.log('📦 Phase4 表自检完成')
 }
 
 async function handleGuestStart(req, res) {
@@ -1536,6 +1842,10 @@ async function matchForumRoute(req, res, pathname, method, url) {
       supportedMethods.push('GET')
       if (method === 'GET') return await handleListUsers(req, res, url)
     }
+    if (sub === '/search/summary') {
+      supportedMethods.push('GET')
+      if (method === 'GET') return await handleSearchSummary(req, res, url)
+    }
 
     // === 认证路由 ===
     if (sub === '/auth/login') {
@@ -1584,6 +1894,10 @@ async function matchForumRoute(req, res, pathname, method, url) {
           const auth = await authenticate(req)
           return await handleGetInteractions(req, res, id, auth.authenticated ? auth.user : null)
         }
+      }
+      if (parts.length === 3 && parts[2] === 'related') {
+        supportedMethods.push('GET')
+        if (method === 'GET') return await handleRelatedPosts(req, res, id)
       }
     }
 
@@ -1797,6 +2111,10 @@ server.listen(PORT, async () => {
   // 数据库连接正常时自动确保 Phase1 表存在，避免缺表导致 guest/AI 接口 500
   if (dbConnected) {
     await ensurePhase1Tables()
+    // Phase2：问答 / AI 答案 / 引用来源 / 知识库相关表
+    await ensurePhase2Tables()
+    // Phase4：内容审核相关表与字段（moderation_cases / reports 等）
+    await ensurePhase4Tables()
   }
   // Redis 健康检查，失败仅告警不阻断服务（缓存层自动降级）
   try {
