@@ -1154,7 +1154,7 @@ async function handleGetUserProfile(req, res, userId) {
   if (cached) return sendJson(res, 200, cached)
 
   const { rows: userRows } = await dbQuery(
-    `SELECT id, username, nickname, avatar_text, bio, created_at, updated_at FROM users WHERE id = $1`,
+    `SELECT id, handle, nickname, avatar_text, bio, created_at, updated_at FROM users WHERE id = $1`,
     [userId]
   )
   if (userRows.length === 0) {
@@ -1177,7 +1177,7 @@ async function handleGetUserProfile(req, res, userId) {
 
   const result = {
     id: user.id,
-    username: user.username,
+    username: user.handle,
     nickname: user.nickname,
     avatarText: user.avatar_text,
     bio: user.bio,
