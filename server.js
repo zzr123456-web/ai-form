@@ -1028,8 +1028,24 @@ async function handleCreateComment(req, res, authUser, postId) {
   }).catch(() => {})
 
   // 检测评论中是否 @ai小助手，触发 AI 自动回复（异步不阻塞）
-  const trimmedContent = content.trim().toLowerCase()
-  if (trimmedContent.includes('@ai小助手') || trimmedContent.includes('@ai助手') || trimmedContent.includes('@ai-assistant')) {
+  // 关键：中英文混合字符串不做全局 toLowerCase，避免中文 Unicode 映射异常导致匹配失败
+  const _content = content.trim()
+  // 分别对 ASCII 部分和中文关键词做匹配：
+  // 1) @ai小助手 / @AI小助手 / @Ai小助手 等大小写变体
+  // 2) @ai助手 / @AI助手
+  // 3) @ai-assistant / @AI-assistant
+  const _lc = _content.replace(/@[aA][iI](?:[-\u4e00-\u9fff])/g, (m) => m.toLowerCase())
+  const isMentionAI =
+    _content.includes('@ai小助手') ||
+    _content.includes('@AI小助手') ||
+    _content.includes('@Ai小助手') ||
+    _content.includes('@ai助手') ||
+    _content.includes('@AI助手') ||
+    _lc.includes('@ai-assistant') ||
+    // 兜底：大小写不敏感的正则匹配（最稳）
+    /@ai[_\-]*(小?)助手/i.test(_content)
+  console.log(`[AI:mention-check] 评论内容"${_content.slice(0, 80)}" 命中@ai小助手=${isMentionAI}`)
+  if (isMentionAI) {
     generateAIReplyForComment(id, postId).catch(() => {})
   }
 
