@@ -281,8 +281,34 @@ async function handleListBoards(req, res) {
   const cacheKey = boardListKey()
   const cached = await cacheGet(cacheKey)
   if (cached) return sendJson(res, 200, cached)
-  const { rows } = await dbQuery(`SELECT * FROM boards ORDER BY post_count DESC`)
-  const result = rows.map(mapBoard)
+  // 动态统计每个版块的真实帖子数和今日新帖数，避免 boards 表静态字段与实际数据脱节
+  const { rows } = await dbQuery(
+    `SELECT b.*,
+            COALESCE(pc.cnt, 0) AS real_post_count,
+            COALESCE(tc.cnt, 0) AS real_today_posts
+     FROM boards b
+     LEFT JOIN (
+       SELECT board_id, COUNT(*) AS cnt
+       FROM posts
+       WHERE status = 'published'
+       GROUP BY board_id
+     ) pc ON pc.board_id = b.id
+     LEFT JOIN (
+       SELECT board_id, COUNT(*) AS cnt
+       FROM posts
+       WHERE status = 'published'
+         AND created_at >= CURRENT_DATE
+       GROUP BY board_id
+     ) tc ON tc.board_id = b.id
+     ORDER BY real_post_count DESC`
+  )
+  const result = rows.map((row) => ({
+    ...mapBoard(row),
+    postCount: parseInt(row.real_post_count, 10) || 0,
+    todayPosts: parseInt(row.real_today_posts, 10) || 0,
+    // 关注功能尚未实现，清零种子假数据，避免显示 3.2k 等不实数字
+    followers: 0,
+  }))
   await cacheSet(cacheKey, result, TTL_BOARDS)
   return sendJson(res, 200, result)
 }

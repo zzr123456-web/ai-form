@@ -264,7 +264,10 @@ export default function BoardsPage() {
                   </span>
                 )}
                 <span>{formatNumber(b.postCount)} 帖</span>
-                <span>{formatNumber(b.followers)} 关注</span>
+                {/* 关注功能未上线前隐藏，避免显示假数据 */}
+                {Boolean(b.followers) && (
+                  <span>{formatNumber(b.followers)} 关注</span>
+                )}
               </div>
             </button>
           )
