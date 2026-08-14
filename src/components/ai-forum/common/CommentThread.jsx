@@ -161,6 +161,7 @@ function CommentNode({
               replySubmittingId={replySubmittingId}
               onToggleReply={onToggleReply}
               onSubmitReply={onSubmitReply}
+              onReplyTextChange={onReplyTextChange}
               onLike={onLike}
               onReport={onReport}
               onFindCommentById={onFindCommentById}

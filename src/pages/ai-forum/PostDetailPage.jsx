@@ -103,30 +103,29 @@ export default function PostDetailPage() {
       }
       setLoading(false)
 
-      // 进入帖子详情时：若帖子创建时间 < 60 秒（刚发布）且评论中还没有 AI 小助手的评论，
+      // 进入帖子详情时：若帖子创建时间 < 120 秒（刚发布）且评论中还没有 AI 小助手的评论，
       // 启动一轮 AI 轮询——覆盖"发帖后跳转过来但 AI 评论还没生成"的场景
       try {
         if (postData?.createdAt) {
           const postAgeSec = (Date.now() - new Date(postData.createdAt).getTime()) / 1000
-          // 检查是否已有 AI 小助手的评论（author.nickname === 'AI小助手' 或 author.id 以 u_ai 开头）
-          let hasAIComment = false
-          for (const c of _comments) {
-            if (c.author && (c.author.id === 'u_ai_assistant' || c.author.nickname === 'AI小助手')) {
-              hasAIComment = true; break
-            }
-            for (const r of (c.replies || [])) {
-              if (r.author && (r.author.id === 'u_ai_assistant' || r.author.nickname === 'AI小助手')) {
-                hasAIComment = true; break
+          // 递归检查所有层级评论是否有 AI 小助手的评论
+          const hasAICommentInTree = (list) => {
+            for (const c of list) {
+              if (c.author && (c.author.id === 'u_ai_assistant' || c.author.nickname === 'AI小助手')) return true
+              if (c.replies && Array.isArray(c.replies)) {
+                if (hasAICommentInTree(c.replies)) return true
               }
             }
-            if (hasAIComment) break
+            return false
           }
+          const hasAIComment = hasAICommentInTree(_comments)
+          // 统计完整评论数（含任意深度）与 AI 启动时记录的计数一致，避免轮询始终不满足条件
           if (postAgeSec < 120 && !hasAIComment) {
             console.log(`[AI:polling] 新发帖进入详情页 postAge=${postAgeSec.toFixed(0)}s 无AI评论，启动轮询`)
             startAIPolling()
           }
         }
-      } catch { /* startAIPolling 依赖已定义在下方,用 setTimeout 延后防时序问题 */ }
+      } catch { /* startAIPolling 引用提前定义但此处是异步,出错忽略 */ }
 
       // 相关推荐：走专用端点 GET /posts/:id/related，best-effort 加载，失败不影响主流程
       // 不依赖 apiClient.js（避免与并行更新冲突），inline fetch 复用同一鉴权模式
@@ -164,28 +163,29 @@ export default function PostDetailPage() {
     return () => { cancelled = true }
   }, [id])
 
-  // ====== 评论总数：顶层评论 + 嵌套 replies 数量之和 ======
+  // ====== 评论总数：递归统计所有层级（顶层 + 任意深度嵌套 replies） ======
   const totalCommentsCount = useMemo(() => {
-    let sum = comments.length
-    for (const c of comments) {
-      if (c.replies && Array.isArray(c.replies)) {
-        sum += c.replies.length
+    const sumAll = (list) => {
+      let sum = list.length
+      for (const c of list) {
+        if (c.replies && Array.isArray(c.replies)) sum += sumAll(c.replies)
       }
+      return sum
     }
-    return sum
+    return sumAll(comments)
   }, [comments])
 
-  // ====== 从评论嵌套 author 提取 users 数组 ======
-  // 为什么这样做：CommentThread 组件签名要求 users 数组并通过 users.find 查作者，
-  // 后端返回的 comment.author 是嵌套对象，这里抽取后传入以保持组件接口不变
+  // ====== 从评论嵌套 author 提取 users 数组（递归任意深度） ======
+  // 为什么用递归：后端返回的 comment 树可能超过 2 层（AI 回复@嵌套时出现第 3 层）
   const usersFromComments = useMemo(() => {
     const map = new Map()
-    for (const c of comments) {
-      if (c.author) map.set(c.author.id, c.author)
-      for (const r of (c.replies || [])) {
-        if (r.author) map.set(r.author.id, r.author)
+    const collect = (list) => {
+      for (const c of list) {
+        if (c.author) map.set(c.author.id, c.author)
+        if (c.replies && Array.isArray(c.replies)) collect(c.replies)
       }
     }
+    collect(comments)
     return Array.from(map.values())
   }, [comments])
 
@@ -213,11 +213,15 @@ export default function PostDetailPage() {
       try {
         const fresh = await getComments(id)
         const freshList = Array.isArray(fresh) ? fresh : []
-        // 统计新评论总数
-        let newCount = freshList.length
-        for (const c of freshList) {
-          if (c.replies && Array.isArray(c.replies)) newCount += c.replies.length
+        // 递归统计所有层级评论数（与 totalCommentsCount 逻辑一致，避免深度新增漏判）
+        const countAll = (list) => {
+          let s = list.length
+          for (const c of list) {
+            if (c.replies && Array.isArray(c.replies)) s += countAll(c.replies)
+          }
+          return s
         }
+        const newCount = countAll(freshList)
         console.log(`[AI:polling] 第${aiPollingCountRef.current}次 新评论数=${newCount} 旧数=${lastCommentCountRef.current}`)
         if (newCount > lastCommentCountRef.current) {
           // 评论数增加：说明 AI 已写入，刷新并退出轮询
