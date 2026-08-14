@@ -535,6 +535,7 @@ async function detectContentRisk(content, boardId) {
     if (!content || typeof content !== 'string') {
       return { risk_level: 'none', risk_type: 'none' }
     }
+    console.log(`[AI:risk] 开始风险检测 内容长度=${content.length} boardId=${boardId || '无'}`)
     const systemPrompt = `你是一个内容安全审核助手。请对以下内容进行风险分级，只返回JSON：
 {"risk_level": "none|low|medium|high", "risk_type": "spam|abuse|sensitive|misinformation|low_quality|none"}
 风险分级标准：
@@ -548,7 +549,10 @@ async function detectContentRisk(content, boardId) {
     ], { temperature: 0, max_tokens: 128 })
     // 兼容 LLM 可能包裹 ```json``` 或多余文本的情况，提取首个 JSON 对象
     const match = raw.match(/\{[\s\S]*\}/)
-    if (!match) return { risk_level: 'none', risk_type: 'none' }
+    if (!match) {
+      console.warn('[AI:risk] LLM 返回无 JSON，降级为 none')
+      return { risk_level: 'none', risk_type: 'none' }
+    }
     const parsed = JSON.parse(match[0])
     const riskLevel = ['none', 'low', 'medium', 'high'].includes(parsed.risk_level)
       ? parsed.risk_level
@@ -562,13 +566,15 @@ async function detectContentRisk(content, boardId) {
         [boardId]
       )
       if (rows.length > 0 && rows[0].governance_mode === 'safety_first') {
+        console.log(`[AI:risk] 风险升级 low→medium（safety_first版块） risk_type=${riskType}`)
         return { risk_level: 'medium', risk_type: riskType }
       }
     }
+    console.log(`[AI:risk] 风险检测完成 risk_level=${riskLevel} risk_type=${riskType}`)
     return { risk_level: riskLevel, risk_type: riskType }
   } catch (err) {
     // LLM 调用失败或解析失败时降级为无风险，避免阻断主流程
-    console.warn('[detectContentRisk] 风险分级失败:', err.message)
+    console.warn('[AI:risk] 风险分级失败:', err.message)
     return { risk_level: 'none', risk_type: 'none' }
   }
 }
@@ -580,19 +586,27 @@ async function detectContentRisk(content, boardId) {
  * 该函数不抛错、不阻塞主流程，统一用 .catch 兜底
  */
 async function applyContentRisk({ targetType, targetId, content, boardId }) {
-  const { risk_level, risk_type } = await detectContentRisk(content, boardId)
-  if (targetType === 'post') {
-    await dbQuery(`UPDATE posts SET risk_level = $1 WHERE id = $2`, [risk_level, targetId])
-  } else {
-    await dbQuery(`UPDATE comments SET risk_level = $1 WHERE id = $2`, [risk_level, targetId])
-  }
-  // 仅 medium / high 级别进入审核队列，避免低风险内容淹没队列
-  if (risk_level === 'medium' || risk_level === 'high') {
-    await dbQuery(
-      `INSERT INTO moderation_cases (id, target_type, target_id, source, risk_type, risk_level, status, created_at)
-       VALUES ($1, $2, $3, 'ai', $4, $5, 'open', NOW())`,
-      [crypto.randomUUID(), targetType, targetId, risk_type, risk_level]
-    )
+  try {
+    console.log(`[AI:applyRisk] 异步风险检测开始 targetType=${targetType} targetId=${targetId}`)
+    const { risk_level, risk_type } = await detectContentRisk(content, boardId)
+    if (targetType === 'post') {
+      await dbQuery(`UPDATE posts SET risk_level = $1 WHERE id = $2`, [risk_level, targetId])
+    } else {
+      await dbQuery(`UPDATE comments SET risk_level = $1 WHERE id = $2`, [risk_level, targetId])
+    }
+    console.log(`[AI:applyRisk] 风险等级已写入 risk_level=${risk_level} targetId=${targetId}`)
+    // 仅 medium / high 级别进入审核队列，避免低风险内容淹没队列
+    if (risk_level === 'medium' || risk_level === 'high') {
+      await dbQuery(
+        `INSERT INTO moderation_cases (id, target_type, target_id, source, risk_type, risk_level, status, created_at)
+         VALUES ($1, $2, $3, 'ai', $4, $5, 'open', NOW())`,
+        [crypto.randomUUID(), targetType, targetId, risk_type, risk_level]
+      )
+      console.log(`[AI:applyRisk] 已创建审核工单 risk_level=${risk_level} targetId=${targetId}`)
+    }
+  } catch (err) {
+    // 异步流程，失败不阻塞主流程
+    console.warn(`[AI:applyRisk] 异步风险检测异常: ${err.message}`)
   }
 }
 
@@ -1244,16 +1258,20 @@ async function handleAIStream(req, res, authUser) {
  */
 async function handleAIPostAssist(req, res, authUser) {
   const userId = authUser.userId
+  console.log(`[AI:post-assist] 收到请求 userId=${userId}`)
   const rate = await aiRateLimit(userId)
   if (!rate.ok) {
+    console.warn(`[AI:post-assist] 限流拦截 userId=${userId}`)
     return sendJson(res, 429, { error: 'AI 调用过于频繁，请稍后再试' })
   }
 
   const body = await readJsonBody(req)
   const { content, board_id, current_tags } = body
   if (!content || typeof content !== 'string') {
+    console.warn(`[AI:post-assist] 参数缺失 content长度=${content?.length ?? 0}`)
     return sendJson(res, 400, { error: '缺少必填字段：content' })
   }
+  console.log(`[AI:post-assist] 草稿长度=${content.length} board_id=${board_id || '无'} tags=${Array.isArray(current_tags) ? current_tags.length : 0}个`)
 
   const systemPrompt = `你是一个论坛发帖助手。请分析用户的草稿内容，返回JSON格式的辅助建议：
 {"title_candidates": ["标题1","标题2","标题3"], "tag_suggestions": ["标签1","标签2","标签3","标签4"], "polished_content": "润色后的正文", "recommended_board_id": null}
@@ -1274,6 +1292,7 @@ async function handleAIPostAssist(req, res, authUser) {
   let parsed = null
 
   try {
+    console.log('[AI:post-assist] 开始调用 LLM...')
     const result = await createChatCompletion(messages, { temperature: 0.5, max_tokens: 1024 })
     success = true
     usage = result.usage
@@ -1281,8 +1300,10 @@ async function handleAIPostAssist(req, res, authUser) {
     const raw = result.content || ''
     const jsonStr = raw.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
     parsed = JSON.parse(jsonStr)
+    console.log(`[AI:post-assist] LLM 返回成功 解析JSON成功 标题数=${parsed.title_candidates?.length ?? 0} 标签数=${parsed.tag_suggestions?.length ?? 0}`)
   } catch (e) {
     errorMsg = String(e.message || e).slice(0, 500)
+    console.error(`[AI:post-assist] LLM 调用或解析失败: ${errorMsg}`)
   }
 
   const latMs = Date.now() - startMs
@@ -1314,6 +1335,7 @@ async function handleAIQAStart(req, res, authUser) {
   if (!content || typeof content !== 'string') {
     return sendJson(res, 400, { error: '缺少必填字段：content' })
   }
+  console.log(`[AI:qa/start] 收到请求 userId=${userId} 问题长度=${content.length} 问题摘要="${content.slice(0, 80)}"`)
 
   // 创建问题记录，状态置为 answering 表示生成中
   const questionId = crypto.randomUUID()
@@ -1322,6 +1344,7 @@ async function handleAIQAStart(req, res, authUser) {
      VALUES ($1, $2, $3, 'site_only', 'answering', NOW())`,
     [questionId, userId, content]
   )
+  console.log(`[AI:qa/start] 问题记录已创建 question_id=${questionId}`)
 
   // 相似帖子检索：标题 / 摘要 / 正文三字段任一命中即召回
   let similarPosts = []
@@ -1334,9 +1357,10 @@ async function handleAIQAStart(req, res, authUser) {
       [content]
     )
     similarPosts = rows.map((r) => ({ id: r.id, title: r.title, summary: r.summary }))
+    console.log(`[AI:qa/start] 相似帖子检索完成 命中=${similarPosts.length}条`)
   } catch (err) {
     // posts 表查询失败不阻断流程，降级为空列表
-    console.warn('[qa/start] 相似帖子查询失败:', err.message)
+    console.warn('[AI:qa/start] 相似帖子查询失败:', err.message)
   }
 
   // 知识库检索：失败降级，避免知识库表缺失导致整个接口 500
@@ -1350,10 +1374,12 @@ async function handleAIQAStart(req, res, authUser) {
       [content]
     )
     knowledgeItems = rows.map((r) => ({ id: r.id, title: r.title, content: r.content }))
+    console.log(`[AI:qa/start] 知识库检索完成 命中=${knowledgeItems.length}条`)
   } catch (err) {
-    console.warn('[qa/start] 知识库查询失败:', err.message)
+    console.warn('[AI:qa/start] 知识库查询失败:', err.message)
   }
 
+  console.log(`[AI:qa/start] 返回响应 question_id=${questionId}`)
   return sendJson(res, 200, {
     question_id: questionId,
     similar_posts: similarPosts,
@@ -1367,16 +1393,20 @@ async function handleAIQAStart(req, res, authUser) {
  */
 async function handleAIQAStream(req, res, authUser) {
   const userId = authUser.userId
+  console.log(`[AI:qa/stream] 收到请求 userId=${userId}`)
   const rate = await aiRateLimit(userId)
   if (!rate.ok) {
+    console.warn(`[AI:qa/stream] 限流拦截 userId=${userId}`)
     return sendJson(res, 429, { error: 'AI 调用过于频繁，请稍后再试' })
   }
 
   const body = await readJsonBody(req)
   const { question_id } = body
   if (!question_id) {
+    console.warn('[AI:qa/stream] 缺少 question_id')
     return sendJson(res, 400, { error: '缺少必填字段：question_id' })
   }
+  console.log(`[AI:qa/stream] question_id=${question_id}`)
 
   // 回查问题记录拿到原文，重新检索上下文（questions 表未存储检索结果）
   const { rows: qRows } = await dbQuery(
@@ -1384,9 +1414,11 @@ async function handleAIQAStream(req, res, authUser) {
     [question_id]
   )
   if (qRows.length === 0) {
+    console.warn(`[AI:qa/stream] 问题不存在 question_id=${question_id}`)
     return sendJson(res, 404, { error: '问题不存在' })
   }
   const question = qRows[0]
+  console.log(`[AI:qa/stream] 回查问题成功 内容长度=${question.content.length}`)
 
   // 重新检索相似帖子，作为 LLM 上下文与后续引用来源
   let similarPosts = []
@@ -1399,8 +1431,9 @@ async function handleAIQAStream(req, res, authUser) {
       [question.content]
     )
     similarPosts = rows.map((r) => ({ id: r.id, title: r.title, summary: r.summary }))
+    console.log(`[AI:qa/stream] 相似帖子检索完成 命中=${similarPosts.length}条`)
   } catch (err) {
-    console.warn('[qa/stream] 相似帖子查询失败:', err.message)
+    console.warn('[AI:qa/stream] 相似帖子查询失败:', err.message)
   }
 
   let knowledgeItems = []
@@ -1413,8 +1446,9 @@ async function handleAIQAStream(req, res, authUser) {
       [question.content]
     )
     knowledgeItems = rows.map((r) => ({ id: r.id, title: r.title, content: r.content }))
+    console.log(`[AI:qa/stream] 知识库检索完成 命中=${knowledgeItems.length}条`)
   } catch (err) {
-    console.warn('[qa/stream] 知识库查询失败:', err.message)
+    console.warn('[AI:qa/stream] 知识库查询失败:', err.message)
   }
 
   // 拼装上下文：把相似帖子与知识库条目作为参考资料喂给模型
@@ -1440,6 +1474,8 @@ ${knowledgeContext}`
     { role: 'system', content: systemPrompt },
     { role: 'user', content: question.content },
   ]
+
+  console.log(`[AI:qa/stream] 上下文准备完成 systemPrompt长度=${systemPrompt.length} 开始流式调用 LLM...`)
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -1487,6 +1523,7 @@ ${knowledgeContext}`
     const safetyLabel = fullAnswer.includes('[敏感问题]') ? 'sensitive' : 'normal'
     const answerId = crypto.randomUUID()
     const citationIds = similarPosts.map((p) => p.id)
+    console.log(`[AI:qa/stream] 流式完成 回答长度=${fullAnswer.length} safety_label=${safetyLabel} 开始落库...`)
 
     try {
       await dbQuery(
@@ -1504,15 +1541,18 @@ ${knowledgeContext}`
       }
       // 更新问题状态为已回答
       await dbQuery(`UPDATE questions SET status='answered' WHERE id=$1`, [question_id])
+      console.log(`[AI:qa/stream] 落库成功 answer_id=${answerId} citations=${citationIds.length}条`)
     } catch (err) {
-      console.warn('[qa/stream] 落库失败:', err.message)
+      console.warn('[AI:qa/stream] 落库失败:', err.message)
     }
 
     writeUsageLog()
     res.write(`data: ${JSON.stringify({ done: true, safety_label: safetyLabel, question_id })}\n\n`)
     res.end()
+    console.log(`[AI:qa/stream] SSE 响应已结束 question_id=${question_id}`)
   } catch (e) {
     errorMsg = String(e.message || e).slice(0, 500)
+    console.error(`[AI:qa/stream] 流式生成失败: ${errorMsg}`)
     writeUsageLog()
     res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`)
     res.write(`data: ${JSON.stringify({ done: true, safety_label: 'normal', question_id })}\n\n`)

@@ -61,6 +61,7 @@ function validateMessages(messages) {
 export async function createChatCompletion(messages, options = {}) {
   const key = getApiKey()
   if (!key) {
+    console.error('[LLM:createChatCompletion] DEEPSEEK_API_KEY 未配置，无法调用 AI')
     throw new Error('DEEPSEEK_API_KEY not configured')
   }
 
@@ -78,6 +79,9 @@ export async function createChatCompletion(messages, options = {}) {
     messages,
   }
 
+  console.log(`[LLM:createChatCompletion] 开始调用 model=${model} temp=${temperature} maxTokens=${maxTokens} messages=${messages.length}条`)
+
+  const startMs = Date.now()
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT)
 
@@ -93,6 +97,8 @@ export async function createChatCompletion(messages, options = {}) {
       signal: controller.signal,
     })
 
+    console.log(`[LLM:createChatCompletion] 收到响应 status=${response.status} ok=${response.ok}`)
+
     const rawText = await response.text()
     let rawData = null
     try {
@@ -102,14 +108,24 @@ export async function createChatCompletion(messages, options = {}) {
     }
 
     if (!response.ok) {
-      const bodyPreview = rawText || '(empty response body)'
+      const bodyPreview = rawText.slice(0, 300) || '(empty response body)'
+      console.error(`[LLM:createChatCompletion] API 返回错误 ${response.status}: ${bodyPreview}`)
       throw new Error(`Deepseek API ${response.status}: ${bodyPreview}`)
     }
 
     const content = rawData?.choices?.[0]?.message?.content ?? ''
     const usage = rawData?.usage || null
+    const latency = Date.now() - startMs
+    console.log(`[LLM:createChatCompletion] 成功 content长度=${content.length} prompt_tokens=${usage?.prompt_tokens ?? '?'} completion_tokens=${usage?.completion_tokens ?? '?'} 耗时=${latency}ms`)
 
     return { content, usage, raw: rawData }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error(`[LLM:createChatCompletion] 请求超时（${DEFAULT_TIMEOUT}ms）`)
+    } else if (!err.message?.startsWith('Deepseek API')) {
+      console.error('[LLM:createChatCompletion] 网络异常:', err.message)
+    }
+    throw err
   } finally {
     clearTimeout(timeoutId)
   }
@@ -125,6 +141,7 @@ export async function createChatCompletion(messages, options = {}) {
 export async function streamChatCompletion(messages, options = {}, onChunk, onDone) {
   const key = getApiKey()
   if (!key) {
+    console.error('[LLM:streamChatCompletion] DEEPSEEK_API_KEY 未配置，无法调用 AI')
     throw new Error('DEEPSEEK_API_KEY not configured')
   }
 
@@ -149,6 +166,9 @@ export async function streamChatCompletion(messages, options = {}, onChunk, onDo
     messages,
   }
 
+  const startMs = Date.now()
+  console.log(`[LLM:streamChatCompletion] 开始调用 model=${model} temp=${temperature} maxTokens=${maxTokens} messages=${messages.length}条`)
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT)
 
@@ -164,13 +184,17 @@ export async function streamChatCompletion(messages, options = {}, onChunk, onDo
       signal: controller.signal,
     })
 
+    console.log(`[LLM:streamChatCompletion] 收到响应 status=${response.status} ok=${response.ok} 耗时=${Date.now() - startMs}ms`)
+
     if (!response.ok) {
       const rawText = await response.text()
+      console.error(`[LLM:streamChatCompletion] API 返回错误 ${response.status}: ${rawText.slice(0, 300)}`)
       throw new Error(`Deepseek API ${response.status}: ${rawText || '(empty response body)'}`)
     }
 
     const reader = response.body?.getReader()
     if (!reader) {
+      console.error('[LLM:streamChatCompletion] Response body 不可读')
       throw new Error('Response body is not readable')
     }
 
@@ -179,6 +203,8 @@ export async function streamChatCompletion(messages, options = {}, onChunk, onDo
     let finalText = ''
     let usage = null
     let done = false
+    let chunkCount = 0
+    let firstChunkMs = 0
 
     try {
       while (!done) {
@@ -214,6 +240,11 @@ export async function streamChatCompletion(messages, options = {}, onChunk, onDo
 
           const delta = data?.choices?.[0]?.delta?.content
           if (delta && typeof delta === 'string') {
+            if (chunkCount === 0) {
+              firstChunkMs = Date.now() - startMs
+              console.log(`[LLM:streamChatCompletion] 首个 chunk 到达 耗时=${firstChunkMs}ms`)
+            }
+            chunkCount++
             finalText += delta
             onChunk(delta)
           }
@@ -227,7 +258,17 @@ export async function streamChatCompletion(messages, options = {}, onChunk, onDo
       }
     }
 
+    const totalMs = Date.now() - startMs
+    console.log(`[LLM:streamChatCompletion] 流式结束 总chunks=${chunkCount} 文本长度=${finalText.length} prompt_tokens=${usage?.prompt_tokens ?? '?'} completion_tokens=${usage?.completion_tokens ?? '?'} 总耗时=${totalMs}ms`)
+
     onDone(finalText, usage)
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error(`[LLM:streamChatCompletion] 请求超时（${DEFAULT_TIMEOUT}ms）`)
+    } else if (!err.message?.startsWith('Deepseek API')) {
+      console.error('[LLM:streamChatCompletion] 网络异常:', err.message)
+    }
+    throw err
   } finally {
     clearTimeout(timeoutId)
   }
